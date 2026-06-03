@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>คลังรูปภาพกิจกรรม</title>
+
+  <!-- ═══ PWA ═══ -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#22c55e" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Gallery" />
+  <link rel="apple-touch-icon" href="icon-192x192.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192x192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512x512.png" />
+
+  <!-- ═══ Fonts ═══ -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- ═══ Tailwind CSS ═══ -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            kanit:  ['Kanit',  'sans-serif'],
+            prompt: ['Prompt', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50:  '#f0fdf4',
+              100: '#dcfce7',
+              400: '#4ade80',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              900: '#14532d',
+            },
+            dark: {
+              950: '#030712',
+              900: '#0d1117',
+              800: '#161b22',
+              700: '#21262d',
+              600: '#30363d',
+              500: '#484f58',
+              400: '#6e7681',
+            }
+          },
+          animation: {
+            'fade-up':    'fadeUp 0.5s ease both',
+            'fade-in':    'fadeIn 0.3s ease both',
+            'spin-slow':  'spin 1.5s linear infinite',
+            'pulse-slow': 'pulse 2.5s cubic-bezier(0.4,0,0.6,1) infinite',
+          },
+          keyframes: {
+            fadeUp: {
+              '0%':   { opacity: '0', transform: 'translateY(24px)' },
+              '100%': { opacity: '1', transform: 'translateY(0)' },
+            },
+            fadeIn: {
+              '0%':   { opacity: '0' },
+              '100%': { opacity: '1' },
+            },
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* ── Global ── */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root {
+      --bg:           #0d1117;
+      --surface:      #161b22;
+      --border:       #30363d;
+      --text-primary: #e6edf3;
+      --text-muted:   #8b949e;
+      --accent:       #22c55e;
+      --accent-dim:   rgba(34,197,94,0.15);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-primary);
+      font-family: 'Prompt', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+    /* ── Noise texture overlay ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Glowing gradient mesh background ── */
+    .bg-mesh {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 15% 10%,  rgba(34,197,94,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 50% at 85% 80%,  rgba(16,185,129,0.05) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 30% at 50% 50%,  rgba(20,83,45,0.08)  0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* ── Header glow line ── */
+    .header-line {
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    }
+
+    /* ── Category pill ── */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.375rem 1rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .pill-inactive {
+      background: var(--surface);
+      border-color: var(--border);
+      color: var(--text-muted);
+    }
+    .pill-inactive:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .pill-active {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ── Card ── */
+    .gallery-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+    }
+    .gallery-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent);
+      box-shadow: 0 8px 32px rgba(34,197,94,0.12), 0 2px 8px rgba(0,0,0,0.4);
+    }
+    .gallery-card:hover .card-img {
+      transform: scale(1.04);
+    }
+
+    /* ── Card image ── */
+    .card-img-wrap {
+      position: relative;
+      overflow: hidden;
+      aspect-ratio: 4/3;
+      background: var(--dark-800);
+    }
+    .card-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.4s ease;
+      display: block;
+    }
+    .card-img-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--dark-700);
+      color: var(--text-muted);
+    }
+
+    /* ── Overlay on hover ── */
+    .card-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      display: flex;
+      align-items: flex-end;
+      padding: 1rem;
+    }
+    .gallery-card:hover .card-overlay { opacity: 1; }
+
+    /* ── Category badge on card ── */
+    .cat-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(8px);
+      color: var(--accent);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(34,197,94,0.35);
+      font-family: 'Kanit', sans-serif;
+    }
+
+    /* ── Staggered animation for cards ── */
+    .card-wrapper { animation: fadeUp 0.5s ease both; }
+    .card-wrapper:nth-child(1)  { animation-delay: 0.05s; }
+    .card-wrapper:nth-child(2)  { animation-delay: 0.10s; }
+    .card-wrapper:nth-child(3)  { animation-delay: 0.15s; }
+    .card-wrapper:nth-child(4)  { animation-delay: 0.20s; }
+    .card-wrapper:nth-child(5)  { animation-delay: 0.25s; }
+    .card-wrapper:nth-child(6)  { animation-delay: 0.30s; }
+    .card-wrapper:nth-child(7)  { animation-delay: 0.35s; }
+    .card-wrapper:nth-child(8)  { animation-delay: 0.40s; }
+    .card-wrapper:nth-child(9)  { animation-delay: 0.45s; }
+    .card-wrapper:nth-child(n+10) { animation-delay: 0.50s; }
+
+    /* ── Lightbox ── */
+    #lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(10px);
+      animation: fadeIn 0.25s ease;
+    }
+    #lightbox.hidden { display: none; }
+
+    .lightbox-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      max-width: 860px;
+      width: 100%;
+      max-height: 92vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.8);
+      animation: fadeUp 0.3s ease;
+    }
+
+    @media (min-width: 768px) {
+      .lightbox-card { flex-direction: row; max-height: 80vh; }
+      .lightbox-img-side { width: 55%; flex-shrink: 0; }
+      .lightbox-info-side { overflow-y: auto; }
+    }
+
+    .lightbox-img-side {
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      max-height: 50vh;
+    }
+    @media (min-width: 768px) {
+      .lightbox-img-side { max-height: none; }
+    }
+
+    .lightbox-img-side img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    .lightbox-info-side {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 48px; height: 48px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Search ── */
+    .search-input {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      border-radius: 8px;
+      padding: 0.5rem 1rem 0.5rem 2.5rem;
+      font-family: 'Prompt', sans-serif;
+      font-size: 0.875rem;
+      transition: border-color 0.2s;
+      width: 100%;
+    }
+    .search-input::placeholder { color: var(--text-muted); }
+    .search-input:focus { outline: none; border-color: var(--accent); }
+
+    /* ── Close button ── */
+    .close-btn {
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: white;
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+      font-size: 1rem;
+    }
+    .close-btn:hover { background: rgba(255,255,255,0.2); }
+
+    /* ── Stats bar ── */
+    .stat-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s ease infinite;
+    }
+    /* ── Upload Modal ── */
+    #upload-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(0,0,0,0.88);
+      backdrop-filter: blur(12px);
+      animation: fadeIn 0.25s ease;
+    }
+    #upload-modal.hidden { display: none; }
+
+    .upload-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 540px;
+      max-height: 92vh;
+      overflow-y: auto;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.8);
+      animation: fadeUp 0.3s ease;
+    }
+
+    .upload-field label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+      font-family: 'Kanit', sans-serif;
+    }
+    .upload-field input,
+    .upload-field textarea,
+    .upload-field select {
+      width: 100%;
+      background: var(--dark-700);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      font-family: 'Prompt', sans-serif;
+      font-size: 0.875rem;
+      transition: border-color 0.2s;
+      resize: none;
+    }
+    .upload-field input:focus,
+    .upload-field textarea:focus,
+    .upload-field select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .upload-field select option { background: var(--surface); }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 2rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+    }
+    .drop-zone:hover,
+    .drop-zone.dragover {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Preview */
+    .preview-img {
+      width: 100%;
+      max-height: 180px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      display: block;
+    }
+
+    /* Progress bar */
+    .progress-bar-wrap {
+      background: var(--dark-700);
+      border-radius: 999px;
+      height: 6px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #4ade80);
+      border-radius: 999px;
+      transition: width 0.3s ease;
+    }
+
+    /* Toast notification */
+    #toast {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      z-index: 99999;
+      padding: 0.75rem 1.5rem;
+      border-radius: 10px;
+      font-family: 'Prompt', sans-serif;
+      font-size: 0.875rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s ease;
+      opacity: 0;
+      white-space: nowrap;
+    }
+    #toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+    #toast.success { background: #14532d; border: 1px solid #166534; color: #86efac; }
+    #toast.error   { background: #450a0a; border: 1px solid #7f1d1d; color: #fca5a5; }
+    #toast.info    { background: #1e3a5f; border: 1px solid #1d4ed8; color: #93c5fd; }
+
+    /* Upload button */
+    .btn-upload-trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1.25rem;
+      background: linear-gradient(135deg, #16a34a, #15803d);
+      color: white;
+      border-radius: 8px;
+      font-family: 'Kanit', sans-serif;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.2s, transform 0.15s;
+      box-shadow: 0 2px 8px rgba(34,197,94,0.3);
+    }
+    .btn-upload-trigger:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-upload-trigger:active { transform: translateY(0); }
+  </style>
+</head>
+
+<body>
+  <div class="bg-mesh"></div>
+
+  <div class="relative z-10">
+
+    <!-- ══════════════════ HEADER ══════════════════ -->
+    <header class="sticky top-0 z-50 bg-dark-900/80 backdrop-blur-md border-b border-dark-700/60">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <!-- Logo icon -->
+          <div class="w-9 h-9 rounded-lg bg-brand-700/40 border border-brand-600/30 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+            </svg>
+          </div>
+          <div>
+            <h1 class="font-kanit font-semibold text-white text-base sm:text-lg leading-tight">คลังรูปภาพกิจกรรม</h1>
+            <p class="text-xs text-dark-400 font-prompt hidden sm:block">Photo Gallery System</p>
+          </div>
+        </div>
+        <!-- Stats + Upload btn -->
+        <div class="flex items-center gap-3">
+          <div id="stats-bar" class="hidden items-center gap-2 text-xs text-dark-400 font-prompt">
+            <div class="stat-dot"></div>
+            <span id="stats-text">กำลังโหลด...</span>
+          </div>
+          <button id="btn-open-upload" class="btn-upload-trigger" title="อัปโหลดรูปภาพใหม่">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+            </svg>
+            <span class="hidden sm:inline">อัปโหลดรูป</span>
+          </button>
+        </div>
+      </div>
+      <div class="header-line"></div>
+    </header>
+
+    <!-- ══════════════════ HERO ══════════════════ -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 pt-10 pb-8 text-center">
+      <p class="text-brand-400 text-xs font-kanit font-semibold tracking-[0.2em] uppercase mb-3 animate-fade-in" style="animation-delay:0.1s">Activity Photo Archive</p>
+      <h2 class="font-kanit font-bold text-3xl sm:text-4xl md:text-5xl text-white mb-3 animate-fade-up" style="animation-delay:0.15s">
+        ภาพกิจกรรม<span class="text-brand-400">ประจำปี</span>
+      </h2>
+      <p class="font-prompt text-dark-400 text-sm sm:text-base max-w-xl mx-auto animate-fade-up" style="animation-delay:0.2s">
+        รวบรวมภาพบันทึกกิจกรรม โครงการ และงานสำคัญต่าง ๆ ของหน่วยงาน
+      </p>
+    </section>
+
+    <!-- ══════════════════ CONTROLS ══════════════════ -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 mb-8 animate-fade-up" style="animation-delay:0.25s">
+      <div class="bg-dark-800/60 border border-dark-700/60 rounded-xl p-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+
+        <!-- Search -->
+        <div class="relative flex-1 w-full sm:max-w-xs">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
+          <input id="search-input" class="search-input" type="text" placeholder="ค้นหากิจกรรม..." />
+        </div>
+
+        <!-- Category pills -->
+        <div id="category-pills" class="flex flex-wrap gap-2">
+          <button class="pill pill-active" data-cat="__all__">ทั้งหมด</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════ GALLERY GRID ══════════════════ -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 pb-20">
+
+      <!-- Loading state -->
+      <div id="loading-state" class="flex flex-col items-center justify-center py-24 gap-4">
+        <div class="spinner"></div>
+        <p class="font-prompt text-dark-400 text-sm animate-pulse-slow">กำลังโหลดรูปภาพ...</p>
+      </div>
+
+      <!-- Error state -->
+      <div id="error-state" class="hidden flex-col items-center justify-center py-24 gap-4 text-center">
+        <div class="w-16 h-16 rounded-2xl bg-red-900/20 border border-red-800/40 flex items-center justify-center">
+          <svg class="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+          </svg>
+        </div>
+        <p class="font-kanit font-semibold text-white text-lg">ไม่สามารถโหลดข้อมูลได้</p>
+        <p id="error-msg" class="font-prompt text-dark-400 text-sm max-w-md"></p>
+        <button onclick="loadGallery()" class="mt-2 px-5 py-2 rounded-lg bg-brand-700/30 border border-brand-600/40 text-brand-400 font-prompt text-sm hover:bg-brand-700/50 transition-colors">ลองใหม่อีกครั้ง</button>
+      </div>
+
+      <!-- Empty state -->
+      <div id="empty-state" class="hidden flex-col items-center justify-center py-24 gap-4 text-center">
+        <div class="w-16 h-16 rounded-2xl bg-dark-800 border border-dark-700 flex items-center justify-center">
+          <svg class="w-8 h-8 text-dark-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+          </svg>
+        </div>
+        <p class="font-kanit font-semibold text-white text-lg">ไม่พบรูปภาพ</p>
+        <p class="font-prompt text-dark-400 text-sm">ลองเปลี่ยนคำค้นหาหรือหมวดหมู่</p>
+      </div>
+
+      <!-- Grid -->
+      <div id="gallery-grid" class="hidden grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5"></div>
+
+    </main>
+  </div>
+
+  <!-- ══════════════════ LIGHTBOX ══════════════════ -->
+  <div id="lightbox" class="hidden" role="dialog" aria-modal="true">
+    <div class="lightbox-card relative" id="lightbox-card">
+      <button class="close-btn" id="lightbox-close" aria-label="ปิด">✕</button>
+
+      <!-- Image side -->
+      <div class="lightbox-img-side" id="lb-img-wrap">
+        <img id="lb-img" src="" alt="" />
+      </div>
+
+      <!-- Info side -->
+      <div class="lightbox-info-side">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span id="lb-cat" class="text-xs font-kanit font-semibold px-3 py-1 rounded-full bg-brand-900/60 border border-brand-700/40 text-brand-400"></span>
+          <span id="lb-date" class="text-xs font-prompt text-dark-400"></span>
+        </div>
+        <h3 id="lb-title" class="font-kanit font-semibold text-white text-xl leading-snug"></h3>
+        <p id="lb-desc" class="font-prompt text-sm text-dark-400 leading-relaxed"></p>
+
+        <!-- Navigation -->
+        <div class="flex gap-3 mt-auto pt-4 border-t border-dark-700">
+          <button id="lb-prev" class="flex-1 py-2 px-4 rounded-lg bg-dark-700 hover:bg-dark-600 text-sm font-prompt text-white transition-colors flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+            </svg>ก่อนหน้า
+          </button>
+          <button id="lb-next" class="flex-1 py-2 px-4 rounded-lg bg-dark-700 hover:bg-dark-600 text-sm font-prompt text-white transition-colors flex items-center justify-center gap-2">
+            ถัดไป<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+            </svg>
+          </button>
+        </div>
+        <p id="lb-counter" class="text-center text-xs text-dark-400 font-prompt"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ UPLOAD MODAL ══════════════════ -->
+  <div id="upload-modal" class="hidden" role="dialog" aria-modal="true" aria-label="อัปโหลดรูปภาพ">
+    <div class="upload-card">
+
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-dark-700">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-brand-700/40 border border-brand-600/30 flex items-center justify-center flex-shrink-0">
+            <svg class="w-4 h-4 text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="font-kanit font-semibold text-white text-base leading-tight">อัปโหลดรูปภาพกิจกรรม</h3>
+            <p class="text-xs text-dark-400 font-prompt">รองรับ JPG, PNG, WEBP · ขนาดไม่เกิน 10MB</p>
+          </div>
+        </div>
+        <button class="close-btn" id="upload-close">✕</button>
+      </div>
+
+      <!-- Body -->
+      <div class="p-5 flex flex-col gap-4">
+
+        <!-- Drop Zone -->
+        <div class="drop-zone" id="drop-zone">
+          <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp,image/gif" />
+          <div id="drop-zone-content">
+            <svg class="w-10 h-10 text-dark-500 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+            </svg>
+            <p class="font-kanit text-sm text-dark-400 font-medium">วางรูปที่นี่ หรือ <span class="text-brand-400">คลิกเพื่อเลือกไฟล์</span></p>
+            <p class="font-prompt text-xs text-dark-500 mt-1">JPG · PNG · WEBP · GIF · สูงสุด 10MB</p>
+          </div>
+        </div>
+
+        <!-- Image Preview (hidden until file selected) -->
+        <div id="preview-wrap" class="hidden">
+          <img id="preview-img" class="preview-img" src="" alt="preview" />
+          <div class="flex items-center justify-between mt-2">
+            <span id="preview-filename" class="text-xs text-dark-400 font-prompt truncate max-w-[200px]"></span>
+            <button id="preview-remove" class="text-xs text-red-400 hover:text-red-300 font-prompt flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>ลบรูป
+            </button>
+          </div>
+        </div>
+
+        <!-- Metadata Fields -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+          <div class="upload-field sm:col-span-2">
+            <label>ชื่อกิจกรรม <span class="text-red-400">*</span></label>
+            <input id="up-title" type="text" placeholder="เช่น อบรมเกษตรกรรุ่นใหม่" maxlength="120" />
+          </div>
+
+          <div class="upload-field">
+            <label>หมวดหมู่</label>
+            <select id="up-category">
+              <option value="">-- เลือกหมวดหมู่ --</option>
+              <option>อบรม/สัมมนา</option>
+              <option>งานประเพณี</option>
+              <option>ประชุม</option>
+              <option>ลงพื้นที่</option>
+              <option>พิธีการ</option>
+              <option>ทั่วไป</option>
+            </select>
+            <input id="up-category-custom" type="text" placeholder="หรือพิมพ์หมวดหมู่ใหม่..." class="mt-1.5" style="display:none" />
+          </div>
+
+          <div class="upload-field">
+            <label>วันที่จัดกิจกรรม</label>
+            <input id="up-date" type="text" placeholder="dd/MM/yyyy เช่น 01/08/2567" maxlength="12" />
+          </div>
+
+          <div class="upload-field sm:col-span-2">
+            <label>รายละเอียด</label>
+            <textarea id="up-desc" rows="3" placeholder="บรรยายกิจกรรมโดยย่อ..."></textarea>
+          </div>
+        </div>
+
+        <!-- Progress (hidden) -->
+        <div id="upload-progress-wrap" class="hidden">
+          <div class="flex items-center justify-between mb-1.5">
+            <span id="upload-progress-label" class="text-xs text-dark-400 font-prompt">กำลังอัปโหลด...</span>
+            <span id="upload-progress-pct" class="text-xs text-brand-400 font-kanit font-semibold">0%</span>
+          </div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="upload-progress-fill" style="width:0%"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Footer -->
+      <div class="px-5 pb-5 flex gap-3">
+        <button id="upload-cancel-btn" class="flex-1 py-2.5 px-4 rounded-lg bg-dark-700 hover:bg-dark-600 text-sm font-prompt text-white transition-colors">
+          ยกเลิก
+        </button>
+        <button id="upload-submit-btn" class="flex-1 py-2.5 px-4 rounded-lg font-kanit font-semibold text-sm text-white transition-all
+          bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-500 hover:to-brand-600
+          disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2" disabled>
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+          </svg>
+          อัปโหลด
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast"></div>
+
+  <!-- ══════════════════ FOOTER ══════════════════ -->
+  <footer class="relative z-10 border-t border-dark-700/50 py-6 text-center">
+    <p class="font-prompt text-xs text-dark-500">Gallery System • Powered by Google Apps Script</p>
+  </footer>
+
+
+  <!-- ══════════════════ JAVASCRIPT ══════════════════ -->
+  <script>
+    // ╔══════════════════════════════════════════════╗
+    // ║  ⚙️  CONFIG — แก้ไขค่านี้เพียงจุดเดียว       ║
+    // ╚══════════════════════════════════════════════╝
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyPghqA070LklU4Y7hmirLaUtKDu6ii8li7B3bWzRiNTKUMds-Gbt1kufT67SCuOd0s/exec";
+    //                                                ↑ วางลิงก์ Web App ของคุณตรงนี้
+
+    // ── State ──────────────────────────────────────
+    let allItems        = [];   // ข้อมูลทั้งหมดจาก GAS
+    let filteredItems   = [];   // หลังกรอง
+    let currentCat      = "__all__";
+    let currentSearch   = "";
+    let lightboxIndex   = 0;
+
+    // ── DOM refs ───────────────────────────────────
+    const $grid         = document.getElementById("gallery-grid");
+    const $loading      = document.getElementById("loading-state");
+    const $error        = document.getElementById("error-state");
+    const $errorMsg     = document.getElementById("error-msg");
+    const $empty        = document.getElementById("empty-state");
+    const $pills        = document.getElementById("category-pills");
+    const $search       = document.getElementById("search-input");
+    const $statsBar     = document.getElementById("stats-bar");
+    const $statsText    = document.getElementById("stats-text");
+    const $lightbox     = document.getElementById("lightbox");
+    const $lbImg        = document.getElementById("lb-img");
+    const $lbTitle      = document.getElementById("lb-title");
+    const $lbDesc       = document.getElementById("lb-desc");
+    const $lbCat        = document.getElementById("lb-cat");
+    const $lbDate       = document.getElementById("lb-date");
+    const $lbCounter    = document.getElementById("lb-counter");
+
+
+    // ════════════════════════════════════════════════
+    //  DATA LOADING
+    // ════════════════════════════════════════════════
+    async function loadGallery() {
+      showState("loading");
+      try {
+        // ── ตรวจสอบว่าผู้ใช้ยังไม่ได้ตั้งค่า URL ──
+        if (GAS_URL.includes("YOUR_DEPLOYMENT_ID")) {
+          throw new Error("กรุณาตั้งค่า GAS_URL ในไฟล์ index.html ก่อนใช้งาน\n(แทนที่ YOUR_DEPLOYMENT_ID ด้วย Web App URL จริง)");
+        }
+
+        const res  = await fetch(GAS_URL, { redirect: "follow" });
+        if (!res.ok) throw new Error("HTTP " + res.status + " — ไม่สามารถเชื่อมต่อ GAS ได้");
+
+        const json = await res.json();
+        if (json.status !== "success") throw new Error(json.message || "ข้อมูลไม่ถูกต้อง");
+
+        allItems = json.data || [];
+        buildCategoryPills();
+        applyFilters();
+
+        $statsBar.classList.remove("hidden");
+        $statsBar.classList.add("flex");
+        updateStats();
+
+      } catch (err) {
+        showState("error");
+        $errorMsg.textContent = err.message;
+        console.error("[Gallery]", err);
+      }
+    }
+
+    // ════════════════════════════════════════════════
+    //  FILTER & RENDER
+    // ════════════════════════════════════════════════
+    function applyFilters() {
+      const q = currentSearch.toLowerCase().trim();
+      filteredItems = allItems.filter(item => {
+        const matchCat    = currentCat === "__all__" || item.category === currentCat;
+        const matchSearch = !q ||
+          item.title.toLowerCase().includes(q) ||
+          item.description.toLowerCase().includes(q) ||
+          item.category.toLowerCase().includes(q);
+        return matchCat && matchSearch;
+      });
+
+      renderGrid();
+      updateStats();
+    }
+
+    function renderGrid() {
+      $grid.innerHTML = "";
+      if (filteredItems.length === 0) { showState("empty"); return; }
+      showState("grid");
+
+      filteredItems.forEach((item, index) => {
+        const card = document.createElement("div");
+        card.className = "card-wrapper";
+        card.innerHTML = buildCardHTML(item, index);
+        card.querySelector(".gallery-card").addEventListener("click", () => openLightbox(index));
+        $grid.appendChild(card);
+      });
+    }
+
+    function buildCardHTML(item, index) {
+      const placeholder = `
+        <div class="card-img-placeholder">
+          <svg class="w-10 h-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5M21 6.75v10.5A2.25 2.25 0 0 1 18.75 19.5H5.25A2.25 2.25 0 0 1 3 17.25V6.75A2.25 2.25 0 0 1 5.25 4.5h13.5A2.25 2.25 0 0 1 21 6.75Z" />
+          </svg>
+        </div>`;
+
+      return `
+        <div class="gallery-card group">
+          <div class="card-img-wrap">
+            ${item.imageUrl
+              ? `<img class="card-img" src="${escHtml(item.imageUrl)}"
+                   alt="${escHtml(item.title)}"
+                   loading="lazy"
+                   onerror="this.parentElement.innerHTML='${placeholder.replace(/"/g,"'")}'" />`
+              : placeholder}
+            ${item.category ? `<span class="cat-badge">${escHtml(item.category)}</span>` : ""}
+            <div class="card-overlay">
+              <span class="text-white text-xs font-prompt opacity-90 flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197M10.5 7.5v6m3-3h-6m13.5 3A7.5 7.5 0 1 1 3 10.5a7.5 7.5 0 0 1 18 0Z" />
+                </svg>ดูรายละเอียด
+              </span>
+            </div>
+          </div>
+          <div class="p-3">
+            <p class="font-kanit font-medium text-white text-sm leading-snug line-clamp-2 mb-1">${escHtml(item.title)}</p>
+            ${item.date ? `<p class="font-prompt text-xs text-dark-400">${escHtml(item.date)}</p>` : ""}
+          </div>
+        </div>`;
+    }
+
+    // ════════════════════════════════════════════════
+    //  CATEGORY PILLS
+    // ════════════════════════════════════════════════
+    function buildCategoryPills() {
+      const cats = [...new Set(allItems.map(i => i.category).filter(Boolean))].sort();
+      $pills.innerHTML = `<button class="pill pill-active" data-cat="__all__">ทั้งหมด (${allItems.length})</button>`;
+      cats.forEach(cat => {
+        const count = allItems.filter(i => i.category === cat).length;
+        const btn   = document.createElement("button");
+        btn.className   = "pill pill-inactive";
+        btn.dataset.cat = cat;
+        btn.textContent = `${cat} (${count})`;
+        $pills.appendChild(btn);
+      });
+    }
+
+    $pills.addEventListener("click", e => {
+      const btn = e.target.closest("[data-cat]");
+      if (!btn) return;
+      currentCat = btn.dataset.cat;
+      $pills.querySelectorAll(".pill").forEach(p => {
+        p.className = p.dataset.cat === currentCat ? "pill pill-active" : "pill pill-inactive";
+      });
+      applyFilters();
+    });
+
+    // ════════════════════════════════════════════════
+    //  SEARCH
+    // ════════════════════════════════════════════════
+    let searchTimer;
+    $search.addEventListener("input", () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        currentSearch = $search.value;
+        applyFilters();
+      }, 250);
+    });
+
+    // ════════════════════════════════════════════════
+    //  LIGHTBOX
+    // ════════════════════════════════════════════════
+    function openLightbox(index) {
+      lightboxIndex = index;
+      renderLightbox();
+      $lightbox.classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeLightbox() {
+      $lightbox.classList.add("hidden");
+      document.body.style.overflow = "";
+      $lbImg.src = "";
+    }
+
+    function renderLightbox() {
+      const item = filteredItems[lightboxIndex];
+      if (!item) return;
+      $lbImg.src           = item.imageUrl || "";
+      $lbImg.alt           = item.title;
+      $lbTitle.textContent = item.title;
+      $lbDesc.textContent  = item.description || "ไม่มีคำอธิบาย";
+      $lbCat.textContent   = item.category || "";
+      $lbDate.textContent  = item.date || "";
+      $lbCounter.textContent = `${lightboxIndex + 1} / ${filteredItems.length}`;
+
+      document.getElementById("lb-prev").disabled = lightboxIndex === 0;
+      document.getElementById("lb-next").disabled = lightboxIndex === filteredItems.length - 1;
+      document.getElementById("lb-prev").style.opacity = lightboxIndex === 0 ? "0.4" : "1";
+      document.getElementById("lb-next").style.opacity = lightboxIndex === filteredItems.length - 1 ? "0.4" : "1";
+    }
+
+    document.getElementById("lightbox-close").addEventListener("click", closeLightbox);
+    document.getElementById("lb-prev").addEventListener("click", () => { if (lightboxIndex > 0) { lightboxIndex--; renderLightbox(); } });
+    document.getElementById("lb-next").addEventListener("click", () => { if (lightboxIndex < filteredItems.length - 1) { lightboxIndex++; renderLightbox(); } });
+
+    $lightbox.addEventListener("click", e => { if (e.target === $lightbox) closeLightbox(); });
+
+    document.addEventListener("keydown", e => {
+      if ($lightbox.classList.contains("hidden")) return;
+      if (e.key === "Escape")      closeLightbox();
+      if (e.key === "ArrowLeft")   { if (lightboxIndex > 0) { lightboxIndex--; renderLightbox(); } }
+      if (e.key === "ArrowRight")  { if (lightboxIndex < filteredItems.length - 1) { lightboxIndex++; renderLightbox(); } }
+    });
+
+    // ════════════════════════════════════════════════
+    //  HELPERS
+    // ════════════════════════════════════════════════
+    function showState(state) {
+      $loading.classList.add("hidden");    $loading.classList.remove("flex");
+      $error.classList.add("hidden");      $error.classList.remove("flex");
+      $empty.classList.add("hidden");      $empty.classList.remove("flex");
+      $grid.classList.add("hidden");       $grid.classList.remove("grid");
+
+      if (state === "loading") { $loading.classList.remove("hidden"); $loading.classList.add("flex"); }
+      if (state === "error")   { $error.classList.remove("hidden");   $error.classList.add("flex"); }
+      if (state === "empty")   { $empty.classList.remove("hidden");   $empty.classList.add("flex"); }
+      if (state === "grid")    { $grid.classList.remove("hidden");    $grid.classList.add("grid"); }
+    }
+
+    function updateStats() {
+      const total    = allItems.length;
+      const showing  = filteredItems.length;
+      $statsText.textContent = showing === total
+        ? `แสดงทั้งหมด ${total} ภาพ`
+        : `แสดง ${showing} จาก ${total} ภาพ`;
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    // ════════════════════════════════════════════════
+    //  UPLOAD SYSTEM
+    // ════════════════════════════════════════════════
+    const $uploadModal    = document.getElementById("upload-modal");
+    const $dropZone       = document.getElementById("drop-zone");
+    const $fileInput      = document.getElementById("file-input");
+    const $previewWrap    = document.getElementById("preview-wrap");
+    const $previewImg     = document.getElementById("preview-img");
+    const $previewName    = document.getElementById("preview-filename");
+    const $previewRemove  = document.getElementById("preview-remove");
+    const $upTitle        = document.getElementById("up-title");
+    const $upCategory     = document.getElementById("up-category");
+    const $upCatCustom    = document.getElementById("up-category-custom");
+    const $upDate         = document.getElementById("up-date");
+    const $upDesc         = document.getElementById("up-desc");
+    const $submitBtn      = document.getElementById("upload-submit-btn");
+    const $progressWrap   = document.getElementById("upload-progress-wrap");
+    const $progressLabel  = document.getElementById("upload-progress-label");
+    const $progressPct    = document.getElementById("upload-progress-pct");
+    const $progressFill   = document.getElementById("upload-progress-fill");
+
+    let selectedFile      = null;  // ไฟล์ที่เลือก
+    let uploadAborted     = false;
+
+    // ── เปิด/ปิด Modal ──────────────────────────────
+    document.getElementById("btn-open-upload").addEventListener("click", openUploadModal);
+    document.getElementById("upload-close").addEventListener("click",     closeUploadModal);
+    document.getElementById("upload-cancel-btn").addEventListener("click", closeUploadModal);
+    $uploadModal.addEventListener("click", e => { if (e.target === $uploadModal) closeUploadModal(); });
+
+    document.addEventListener("keydown", e => {
+      if (!$uploadModal.classList.contains("hidden") && e.key === "Escape") closeUploadModal();
+    });
+
+    function openUploadModal() {
+      resetUploadForm();
+      $uploadModal.classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+      // ตั้งวันที่วันนี้เป็นค่าเริ่มต้น (พ.ศ.)
+      const now  = new Date();
+      const year = now.getFullYear() + 543;
+      const dd   = String(now.getDate()).padStart(2, "0");
+      const mm   = String(now.getMonth() + 1).padStart(2, "0");
+      $upDate.value = `${dd}/${mm}/${year}`;
+    }
+
+    function closeUploadModal() {
+      uploadAborted = true;
+      $uploadModal.classList.add("hidden");
+      document.body.style.overflow = "";
+      resetUploadForm();
+    }
+
+    function resetUploadForm() {
+      selectedFile          = null;
+      uploadAborted         = false;
+      $fileInput.value      = "";
+      $upTitle.value        = "";
+      $upDate.value         = "";
+      $upDesc.value         = "";
+      $upCategory.value     = "";
+      $upCatCustom.value    = "";
+      $upCatCustom.style.display = "none";
+      $previewWrap.classList.add("hidden");
+      $previewImg.src       = "";
+      $progressWrap.classList.add("hidden");
+      setProgress(0, "");
+      $submitBtn.disabled   = true;
+      $submitBtn.innerHTML  = `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+        </svg>อัปโหลด`;
+    }
+
+    // ── Category: ถ้าเลือก "พิมพ์ใหม่" จะแสดง input ──
+    $upCategory.addEventListener("change", () => {
+      if ($upCategory.value === "") {
+        $upCatCustom.style.display = "none";
+      } else {
+        $upCatCustom.style.display = "none";
+      }
+    });
+
+    // เพิ่มตัวเลือก "พิมพ์หมวดหมู่ใหม่" ใน select
+    const optOther = document.createElement("option");
+    optOther.value = "__custom__";
+    optOther.textContent = "➕ พิมพ์หมวดหมู่ใหม่...";
+    $upCategory.appendChild(optOther);
+
+    $upCategory.addEventListener("change", () => {
+      $upCatCustom.style.display = $upCategory.value === "__custom__" ? "block" : "none";
+    });
+
+    // ── Drag & Drop ──────────────────────────────────
+    $dropZone.addEventListener("dragover",  e => { e.preventDefault(); $dropZone.classList.add("dragover"); });
+    $dropZone.addEventListener("dragleave", ()  => $dropZone.classList.remove("dragover"));
+    $dropZone.addEventListener("drop", e => {
+      e.preventDefault();
+      $dropZone.classList.remove("dragover");
+      const file = e.dataTransfer.files[0];
+      if (file) handleFileSelect(file);
+    });
+
+    $fileInput.addEventListener("change", () => {
+      if ($fileInput.files[0]) handleFileSelect($fileInput.files[0]);
+    });
+
+    $previewRemove.addEventListener("click", () => {
+      selectedFile = null;
+      $fileInput.value = "";
+      $previewWrap.classList.add("hidden");
+      $previewImg.src  = "";
+      $submitBtn.disabled = true;
+    });
+
+    function handleFileSelect(file) {
+      // ── ตรวจสอบประเภทไฟล์ ──
+      const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+      if (!allowed.includes(file.type)) {
+        showToast("error", "❌ รองรับเฉพาะ JPG, PNG, WEBP, GIF เท่านั้น");
+        return;
+      }
+      // ── ตรวจสอบขนาดไฟล์ (10MB) ──
+      if (file.size > 10 * 1024 * 1024) {
+        showToast("error", "❌ ไฟล์ขนาดใหญ่เกิน 10MB (" + (file.size / 1024 / 1024).toFixed(1) + "MB)");
+        return;
+      }
+
+      selectedFile = file;
+
+      // แสดง Preview
+      const reader = new FileReader();
+      reader.onload = ev => {
+        $previewImg.src = ev.target.result;
+        $previewWrap.classList.remove("hidden");
+        $previewName.textContent = file.name + " (" + (file.size / 1024).toFixed(0) + " KB)";
+      };
+      reader.readAsDataURL(file);
+
+      $submitBtn.disabled = false;
+
+      // ถ้ายังไม่มีชื่อกิจกรรม ให้ใส่ชื่อไฟล์เป็น placeholder
+      if (!$upTitle.value) {
+        const baseName = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
+        $upTitle.placeholder = baseName;
+      }
+    }
+
+    // ── Submit Upload ────────────────────────────────
+    $submitBtn.addEventListener("click", async () => {
+      if (!selectedFile)           { showToast("error", "❌ กรุณาเลือกรูปภาพก่อน"); return; }
+      const title = $upTitle.value.trim();
+      if (!title)                  { showToast("error", "❌ กรุณาระบุชื่อกิจกรรม"); $upTitle.focus(); return; }
+
+      let category = $upCategory.value === "__custom__"
+        ? $upCatCustom.value.trim()
+        : $upCategory.value.trim();
+      if (!category) category = "ทั่วไป";
+
+      uploadAborted         = false;
+      $submitBtn.disabled   = true;
+      $progressWrap.classList.remove("hidden");
+
+      try {
+        // ── Step 1: อ่านไฟล์เป็น Base64 (30%) ──
+        setProgress(10, "กำลังเตรียมไฟล์...");
+        const base64Data = await fileToBase64(selectedFile);
+
+        if (uploadAborted) return;
+        setProgress(30, "กำลังส่งข้อมูลไปยัง Server...");
+
+        // ── Step 2: ส่งไปยัง GAS (30–90%) ──
+        // Animate progress ระหว่างรอ
+        const progressTimer = animateProgress(30, 85, 15000);
+
+        const payload = {
+          action:      "upload",
+          fileName:    selectedFile.name,
+          mimeType:    selectedFile.type,
+          base64Data:  base64Data,
+          title:       title,
+          description: $upDesc.value.trim(),
+          category:    category,
+          date:        $upDate.value.trim()
+        };
+
+        const res  = await fetch(GAS_URL, {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify(payload),
+          redirect: "follow"
+        });
+
+        clearInterval(progressTimer);
+        if (uploadAborted) return;
+
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const json = await res.json();
+        if (json.status !== "success") throw new Error(json.message || "อัปโหลดไม่สำเร็จ");
+
+        // ── Step 3: สำเร็จ ──
+        setProgress(100, "อัปโหลดสำเร็จ! ✅");
+        showToast("success", "✅ อัปโหลด \"" + title + "\" สำเร็จ!");
+
+        // รีโหลด Gallery และปิด Modal
+        setTimeout(async () => {
+          closeUploadModal();
+          await loadGallery();
+        }, 800);
+
+      } catch (err) {
+        setProgress(0, "");
+        $progressWrap.classList.add("hidden");
+        $submitBtn.disabled = false;
+        showToast("error", "❌ " + err.message);
+        console.error("[Upload Error]", err);
+      }
+    });
+
+    // ── Helpers: Upload ──────────────────────────────
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = e => {
+          // ตัด prefix "data:image/jpeg;base64," ออก
+          const base64 = e.target.result.split(",")[1];
+          resolve(base64);
+        };
+        reader.onerror = () => reject(new Error("อ่านไฟล์ไม่ได้"));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function setProgress(pct, label) {
+      $progressFill.style.width  = pct + "%";
+      $progressPct.textContent   = pct + "%";
+      if (label) $progressLabel.textContent = label;
+    }
+
+    function animateProgress(from, to, durationMs) {
+      const steps    = 60;
+      const stepSize = (to - from) / steps;
+      let   current  = from;
+      const id = setInterval(() => {
+        current = Math.min(current + stepSize, to);
+        $progressFill.style.width = current + "%";
+        $progressPct.textContent  = Math.round(current) + "%";
+        if (current >= to) clearInterval(id);
+      }, durationMs / steps);
+      return id;
+    }
+
+    // ── Toast Notification ───────────────────────────
+    let toastTimer;
+    function showToast(type, msg) {
+      const $toast = document.getElementById("toast");
+      $toast.className = `${type} show`;
+      $toast.textContent = msg;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        $toast.classList.remove("show");
+      }, type === "success" ? 4000 : 5000);
+    }
+
+    // ════════════════════════════════════════════════
+    //  PWA — Service Worker Registration
+    // ════════════════════════════════════════════════
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js")
+          .then(reg => {
+            console.log("[PWA] SW registered:", reg.scope);
+
+            // ถ้ามี SW เวอร์ชันใหม่รอ activate → แจ้งผู้ใช้
+            reg.addEventListener("updatefound", () => {
+              const newWorker = reg.installing;
+              newWorker.addEventListener("statechange", () => {
+                if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+                  showToast("info", "🔄 มีการอัปเดตระบบ — รีโหลดเพื่อใช้เวอร์ชันใหม่");
+                }
+              });
+            });
+          })
+          .catch(err => console.warn("[PWA] SW registration failed:", err));
+      });
+    }
+
+    // ════════════════════════════════════════════════
+    //  PWA — Install Prompt (Add to Home Screen)
+    // ════════════════════════════════════════════════
+    let deferredPrompt = null;
+
+    window.addEventListener("beforeinstallprompt", e => {
+      e.preventDefault();
+      deferredPrompt = e;
+      showInstallBanner();
+    });
+
+    window.addEventListener("appinstalled", () => {
+      deferredPrompt = null;
+      hideInstallBanner();
+      showToast("success", "✅ ติดตั้งแอปสำเร็จ! สามารถเปิดจาก Home Screen ได้เลย");
+    });
+
+    function showInstallBanner() {
+      const existing = document.getElementById("install-banner");
+      if (existing) return;
+
+      const banner = document.createElement("div");
+      banner.id = "install-banner";
+      banner.style.cssText = `
+        position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%);
+        z-index:9998; background:#161b22; border:1px solid #30363d;
+        border-radius:12px; padding:.75rem 1rem; display:flex; align-items:center;
+        gap:.75rem; box-shadow:0 8px 32px rgba(0,0,0,.6); max-width:320px; width:90%;
+        animation:fadeUp .4s ease;
+      `;
+      banner.innerHTML = `
+        <img src="icon-192x192.png" style="width:36px;height:36px;border-radius:8px;flex-shrink:0" />
+        <div style="flex:1;min-width:0">
+          <p style="margin:0;font-size:.8rem;font-weight:600;color:#fff;font-family:'Kanit',sans-serif">
+            ติดตั้งแอปลงเครื่อง</p>
+          <p style="margin:0;font-size:.7rem;color:#8b949e;font-family:'Prompt',sans-serif">
+            เปิดได้เร็วกว่า ใช้งาน Offline ได้</p>
+        </div>
+        <div style="display:flex;gap:.4rem;flex-shrink:0">
+          <button id="install-btn" style="
+            padding:.35rem .85rem; background:#22c55e; color:#fff; border:none;
+            border-radius:6px; font-size:.75rem; font-family:'Kanit',sans-serif;
+            font-weight:600; cursor:pointer;">ติดตั้ง</button>
+          <button id="install-dismiss" style="
+            padding:.35rem .5rem; background:#30363d; color:#8b949e; border:none;
+            border-radius:6px; font-size:.75rem; cursor:pointer;">✕</button>
+        </div>`;
+
+      document.body.appendChild(banner);
+
+      document.getElementById("install-btn").addEventListener("click", async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log("[PWA] Install outcome:", outcome);
+        deferredPrompt = null;
+        hideInstallBanner();
+      });
+
+      document.getElementById("install-dismiss").addEventListener("click", () => {
+        hideInstallBanner();
+        // ไม่แสดงอีก 7 วัน
+        localStorage.setItem("pwa-dismiss", Date.now() + 7 * 24 * 60 * 60 * 1000);
+      });
+    }
+
+    function hideInstallBanner() {
+      const banner = document.getElementById("install-banner");
+      if (banner) banner.remove();
+    }
+
+    // ตรวจสอบว่า dismiss ยังไม่หมดอายุ
+    const dismissedUntil = parseInt(localStorage.getItem("pwa-dismiss") || "0");
+    if (Date.now() > dismissedUntil) {
+      // แสดง banner ได้ตามปกติ (ผ่าน beforeinstallprompt event)
+    }
+
+    // ── Handle ?action=upload shortcut (PWA shortcuts) ──────────
+    if (new URLSearchParams(location.search).get("action") === "upload") {
+      window.addEventListener("load", () => setTimeout(openUploadModal, 800));
+    }
+
+    // ════════════════════════════════════════════════
+    //  INIT
+    // ════════════════════════════════════════════════
+    loadGallery();
+  </script>
+</body>
+</html>
