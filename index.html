@@ -16,6 +16,9 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192x192.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512x512.png" />
 
+  <!-- ═══ Lottie Animation ═══ -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
+
   <!-- ═══ Fonts ═══ -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -501,10 +504,197 @@
     }
     .btn-upload-trigger:hover { opacity: 0.9; transform: translateY(-1px); }
     .btn-upload-trigger:active { transform: translateY(0); }
+    /* ══════════════════════════════════════════
+       SPLASH SCREEN
+    ══════════════════════════════════════════ */
+    #splash {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      background: #0d1117;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    #splash.hiding {
+      opacity: 0;
+      transform: scale(1.04);
+      pointer-events: none;
+    }
+    #splash.gone { display: none; }
+
+    /* Ambient glow behind icon */
+    .splash-glow {
+      position: absolute;
+      width: 280px; height: 280px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(34,197,94,0.18) 0%, transparent 70%);
+      animation: splashPulse 2.2s ease-in-out infinite;
+    }
+    @keyframes splashPulse {
+      0%,100% { transform: scale(1);   opacity: 0.7; }
+      50%      { transform: scale(1.2); opacity: 1;   }
+    }
+
+    /* Icon container */
+    .splash-icon-wrap {
+      position: relative;
+      width: 100px; height: 100px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, #161b22, #1f2937);
+      border: 1.5px solid rgba(34,197,94,0.3);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 40px rgba(34,197,94,0.15), 0 8px 32px rgba(0,0,0,0.6);
+      animation: splashIconIn 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.1s both;
+      z-index: 1;
+    }
+    @keyframes splashIconIn {
+      from { opacity: 0; transform: scale(0.5) translateY(20px); }
+      to   { opacity: 1; transform: scale(1)   translateY(0);    }
+    }
+    .splash-icon-wrap img {
+      width: 68px; height: 68px;
+      border-radius: 16px;
+    }
+
+    /* Ring orbits around icon */
+    .splash-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(34,197,94,0.2);
+      animation: splashRingSpin linear infinite;
+    }
+    .splash-ring-1 {
+      width: 150px; height: 150px;
+      animation-duration: 4s;
+      border-color: rgba(34,197,94,0.25);
+    }
+    .splash-ring-2 {
+      width: 200px; height: 200px;
+      animation-duration: 7s;
+      animation-direction: reverse;
+      border-color: rgba(34,197,94,0.12);
+    }
+    @keyframes splashRingSpin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+    /* Dot on ring */
+    .splash-ring::after {
+      content: '';
+      position: absolute;
+      top: -4px; left: 50%;
+      transform: translateX(-50%);
+      width: 7px; height: 7px;
+      background: #22c55e;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #22c55e;
+    }
+
+    /* App name */
+    .splash-title {
+      font-family: 'Kanit', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 0.03em;
+      margin-top: 1.75rem;
+      animation: splashTextIn 0.6s ease 0.5s both;
+      z-index: 1;
+    }
+    .splash-title span { color: #22c55e; }
+    .splash-subtitle {
+      font-family: 'Prompt', sans-serif;
+      font-size: 0.78rem;
+      color: #6e7681;
+      margin-top: 0.35rem;
+      animation: splashTextIn 0.6s ease 0.7s both;
+      z-index: 1;
+    }
+    @keyframes splashTextIn {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0);    }
+    }
+
+    /* Lottie dots at bottom */
+    .splash-lottie-wrap {
+      margin-top: 2.5rem;
+      width: 72px; height: 72px;
+      animation: splashTextIn 0.5s ease 0.9s both;
+      z-index: 1;
+    }
+
+    /* Version tag */
+    .splash-version {
+      position: absolute;
+      bottom: 2rem;
+      font-family: 'Prompt', sans-serif;
+      font-size: 0.7rem;
+      color: #484f58;
+      animation: splashTextIn 0.5s ease 1s both;
+    }
+
+    /* ══════════════════════════════════════════
+       UPLOAD LOTTIE (replaces progress bar spinner)
+    ══════════════════════════════════════════ */
+    #upload-lottie-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      padding: 1rem 0 0.5rem;
+    }
+    #upload-lottie-wrap.hidden { display: none; }
+
+    #upload-lottie-canvas {
+      width: 90px;
+      height: 90px;
+    }
+    #upload-lottie-label {
+      font-family: 'Prompt', sans-serif;
+      font-size: 0.82rem;
+      color: #8b949e;
+      text-align: center;
+      min-height: 1.2em;
+    }
+    #upload-lottie-pct {
+      font-family: 'Kanit', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #22c55e;
+    }
   </style>
 </head>
 
 <body>
+
+  <!-- ══════════════════ SPLASH SCREEN ══════════════════ -->
+  <div id="splash">
+    <div class="splash-glow"></div>
+
+    <!-- Orbital rings -->
+    <div class="splash-ring splash-ring-2"></div>
+    <div class="splash-ring splash-ring-1"></div>
+
+    <!-- App Icon -->
+    <div class="splash-icon-wrap">
+      <img src="icon-192x192.png" alt="Gallery" />
+    </div>
+
+    <!-- Name -->
+    <p class="splash-title">คลังรูป<span>กิจกรรม</span></p>
+    <p class="splash-subtitle">Activity Photo Gallery</p>
+
+    <!-- Lottie loading spinner -->
+    <div class="splash-lottie-wrap" id="splash-lottie"></div>
+
+    <p class="splash-version">v1.0 · Powered by Google Apps Script</p>
+  </div>
+
   <div class="bg-mesh"></div>
 
   <div class="relative z-10">
@@ -727,7 +917,14 @@
           </div>
         </div>
 
-        <!-- Progress (hidden) -->
+        <!-- Lottie Upload Animation (hidden until uploading) -->
+        <div id="upload-lottie-wrap" class="hidden">
+          <div id="upload-lottie-canvas"></div>
+          <div id="upload-lottie-pct">0%</div>
+          <div id="upload-lottie-label">กำลังเตรียมไฟล์...</div>
+        </div>
+
+        <!-- Progress bar (สำรองเมื่อ Lottie โหลดไม่ได้) -->
         <div id="upload-progress-wrap" class="hidden">
           <div class="flex items-center justify-between mb-1.5">
             <span id="upload-progress-label" class="text-xs text-dark-400 font-prompt">กำลังอัปโหลด...</span>
@@ -772,7 +969,7 @@
     // ╔══════════════════════════════════════════════╗
     // ║  ⚙️  CONFIG — แก้ไขค่านี้เพียงจุดเดียว       ║
     // ╚══════════════════════════════════════════════╝
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwC30djeyli1OSMbGbFcrjdF_RSGkntZr9TESJNwzHQlBoekcTT84scg66e_SaZyoaAxw/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyPghqA070LklU4Y7hmirLaUtKDu6ii8li7B3bWzRiNTKUMds-Gbt1kufT67SCuOd0s/exec";
     //                                                ↑ วางลิงก์ Web App ของคุณตรงนี้
 
     // ── State ──────────────────────────────────────
@@ -1134,63 +1331,63 @@
         showToast("error", "❌ รองรับเฉพาะ JPG, PNG, WEBP, GIF เท่านั้น");
         return;
       }
-      // ── ตรวจสอบขนาดไฟล์ (10MB) ──
-      if (file.size > 10 * 1024 * 1024) {
-        showToast("error", "❌ ไฟล์ขนาดใหญ่เกิน 10MB (" + (file.size / 1024 / 1024).toFixed(1) + "MB)");
+      // ── ตรวจสอบขนาดไฟล์ (20MB ก่อนบีบ) ──
+      if (file.size > 20 * 1024 * 1024) {
+        showToast("error", "❌ ไฟล์ต้นฉบับใหญ่เกิน 20MB");
         return;
       }
 
       selectedFile = file;
 
-      // แสดง Preview
-      const reader = new FileReader();
-      reader.onload = ev => {
-        $previewImg.src = ev.target.result;
-        $previewWrap.classList.remove("hidden");
-        $previewName.textContent = file.name + " (" + (file.size / 1024).toFixed(0) + " KB)";
-      };
-      reader.readAsDataURL(file);
+      // แสดง Preview จาก ObjectURL (เร็วกว่า FileReader)
+      const previewURL = URL.createObjectURL(file);
+      $previewImg.onload = () => URL.revokeObjectURL(previewURL);
+      $previewImg.src   = previewURL;
+      $previewWrap.classList.remove("hidden");
+
+      const origKB = (file.size / 1024).toFixed(0);
+      $previewName.textContent = `${file.name} (ต้นฉบับ ${origKB} KB — จะถูกบีบอัดก่อนส่ง)`;
 
       $submitBtn.disabled = false;
 
-      // ถ้ายังไม่มีชื่อกิจกรรม ให้ใส่ชื่อไฟล์เป็น placeholder
       if (!$upTitle.value) {
-        const baseName = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
-        $upTitle.placeholder = baseName;
+        $upTitle.placeholder = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
       }
     }
 
     // ── Submit Upload ────────────────────────────────
     $submitBtn.addEventListener("click", async () => {
-      if (!selectedFile)           { showToast("error", "❌ กรุณาเลือกรูปภาพก่อน"); return; }
+      if (!selectedFile)  { showToast("error", "❌ กรุณาเลือกรูปภาพก่อน"); return; }
       const title = $upTitle.value.trim();
-      if (!title)                  { showToast("error", "❌ กรุณาระบุชื่อกิจกรรม"); $upTitle.focus(); return; }
+      if (!title)         { showToast("error", "❌ กรุณาระบุชื่อกิจกรรม"); $upTitle.focus(); return; }
 
       let category = $upCategory.value === "__custom__"
         ? $upCatCustom.value.trim()
         : $upCategory.value.trim();
       if (!category) category = "ทั่วไป";
 
-      uploadAborted         = false;
-      $submitBtn.disabled   = true;
+      uploadAborted       = false;
+      $submitBtn.disabled = true;
       $progressWrap.classList.remove("hidden");
 
       try {
-        // ── Step 1: อ่านไฟล์เป็น Base64 (30%) ──
-        setProgress(10, "กำลังเตรียมไฟล์...");
-        const base64Data = await fileToBase64(selectedFile);
-
+        // ── Step 1: บีบอัดรูปก่อนส่ง ──────────────────────────
+        setProgress(10, "กำลังบีบอัดรูปภาพ...");
+        const { base64Data, mimeType, sizeKB } = await compressImage(selectedFile);
         if (uploadAborted) return;
-        setProgress(30, "กำลังส่งข้อมูลไปยัง Server...");
 
-        // ── Step 2: ส่งไปยัง GAS (30–90%) ──
-        // Animate progress ระหว่างรอ
-        const progressTimer = animateProgress(30, 85, 15000);
+        console.log(`[Upload] ขนาดหลังบีบอัด: ${sizeKB} KB (${mimeType})`);
+        setProgress(30, `บีบอัดเสร็จ (${sizeKB} KB) — กำลังส่ง...`);
+
+        // ── Step 2: ส่งไปยัง GAS ───────────────────────────────
+        // 🔑 FIX: ใช้ "text/plain" แทน "application/json"
+        //    เพื่อหลีกเลี่ยง CORS Preflight (OPTIONS) ที่ GAS รับไม่ได้
+        const progressTimer = animateProgress(30, 88, 30000);
 
         const payload = {
           action:      "upload",
-          fileName:    selectedFile.name,
-          mimeType:    selectedFile.type,
+          fileName:    selectedFile.name.replace(/[^\w.\-]/g, "_"),
+          mimeType:    mimeType,
           base64Data:  base64Data,
           title:       title,
           description: $upDesc.value.trim(),
@@ -1198,29 +1395,42 @@
           date:        $upDate.value.trim()
         };
 
-        const res  = await fetch(GAS_URL, {
-          method:  "POST",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify(payload),
-          redirect: "follow"
-        });
+        let res;
+        try {
+          res = await fetch(GAS_URL, {
+            method:   "POST",
+            headers:  { "Content-Type": "text/plain;charset=utf-8" }, // ✅ No preflight
+            body:     JSON.stringify(payload),
+            redirect: "follow"
+          });
+        } catch (networkErr) {
+          throw new Error("เชื่อมต่อ Server ไม่ได้ — ตรวจสอบ GAS_URL และการเชื่อมต่ออินเทอร์เน็ต");
+        }
 
         clearInterval(progressTimer);
         if (uploadAborted) return;
 
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const json = await res.json();
+        // ── Step 3: Parse Response ─────────────────────────────
+        // 🔑 FIX: ตรวจสอบว่า GAS ส่ง JSON มาจริง ไม่ใช่ HTML Error page
+        const rawText = await res.text();
+        let json;
+        try {
+          json = JSON.parse(rawText);
+        } catch (_) {
+          console.error("[Upload] GAS ตอบกลับไม่ใช่ JSON:\n", rawText.slice(0, 300));
+          throw new Error("GAS ตอบกลับผิดรูปแบบ — กรุณา Redeploy Web App แบบ 'New Version'");
+        }
+
         if (json.status !== "success") throw new Error(json.message || "อัปโหลดไม่สำเร็จ");
 
-        // ── Step 3: สำเร็จ ──
+        // ── Step 4: สำเร็จ ─────────────────────────────────────
         setProgress(100, "อัปโหลดสำเร็จ! ✅");
-        showToast("success", "✅ อัปโหลด \"" + title + "\" สำเร็จ!");
+        showToast("success", `✅ อัปโหลด "${title}" สำเร็จ!`);
 
-        // รีโหลด Gallery และปิด Modal
         setTimeout(async () => {
           closeUploadModal();
           await loadGallery();
-        }, 800);
+        }, 900);
 
       } catch (err) {
         setProgress(0, "");
@@ -1232,16 +1442,50 @@
     });
 
     // ── Helpers: Upload ──────────────────────────────
-    function fileToBase64(file) {
+
+    /**
+     * compressImage: ลดขนาดรูปด้วย Canvas ก่อนส่ง
+     * - Resize ให้ไม่เกิน MAX_PX (ด้านยาวที่สุด)
+     * - แปลงเป็น JPEG quality 0.82
+     * - คืนค่า { base64Data, mimeType, sizeKB }
+     */
+    function compressImage(file, MAX_PX = 1400, QUALITY = 0.82) {
       return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload  = e => {
-          // ตัด prefix "data:image/jpeg;base64," ออก
-          const base64 = e.target.result.split(",")[1];
-          resolve(base64);
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+
+          // คำนวณขนาดใหม่ (คงอัตราส่วน)
+          let { width, height } = img;
+          if (width > MAX_PX || height > MAX_PX) {
+            if (width >= height) {
+              height = Math.round(height * MAX_PX / width);
+              width  = MAX_PX;
+            } else {
+              width  = Math.round(width * MAX_PX / height);
+              height = MAX_PX;
+            }
+          }
+
+          // วาดลง Canvas
+          const canvas    = document.createElement("canvas");
+          canvas.width    = width;
+          canvas.height   = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Export เป็น JPEG (ลดขนาดได้มากที่สุด)
+          const dataURL    = canvas.toDataURL("image/jpeg", QUALITY);
+          const base64Data = dataURL.split(",")[1];
+          const sizeKB     = Math.round(base64Data.length * 0.75 / 1024);
+
+          resolve({ base64Data, mimeType: "image/jpeg", sizeKB });
         };
-        reader.onerror = () => reject(new Error("อ่านไฟล์ไม่ได้"));
-        reader.readAsDataURL(file);
+
+        img.onerror = () => reject(new Error("อ่านไฟล์รูปภาพไม่ได้"));
+        img.src = url;
       });
     }
 
@@ -1382,9 +1626,124 @@
     }
 
     // ════════════════════════════════════════════════
+    //  LOTTIE — Instances
+    // ════════════════════════════════════════════════
+    let splashLottie = null;
+    let uploadLottie = null;
+
+    /** โหลด Lottie JSON และ render ลง container */
+    function loadLottie(container, loop, autoplay) {
+      return lottie.loadAnimation({
+        container:  container,
+        renderer:   "svg",
+        loop:       loop,
+        autoplay:   autoplay,
+        path:       "lottie-loading.json"
+      });
+    }
+
+    // ════════════════════════════════════════════════
+    //  SPLASH SCREEN
+    // ════════════════════════════════════════════════
+    const $splash       = document.getElementById("splash");
+    const $splashLottie = document.getElementById("splash-lottie");
+
+    function initSplash() {
+      // Render Lottie spinner ใน splash
+      splashLottie = loadLottie($splashLottie, true, true);
+    }
+
+    function hideSplash() {
+      if (!$splash || $splash.classList.contains("gone")) return;
+      $splash.classList.add("hiding");
+      setTimeout(() => {
+        $splash.classList.add("gone");
+        if (splashLottie) { splashLottie.destroy(); splashLottie = null; }
+      }, 600);
+    }
+
+    // เริ่ม splash ทันทีที่ JS โหลด
+    initSplash();
+
+    // ════════════════════════════════════════════════
+    //  UPLOAD LOTTIE
+    // ════════════════════════════════════════════════
+    const $uploadLottieWrap  = document.getElementById("upload-lottie-wrap");
+    const $uploadLottieEl    = document.getElementById("upload-lottie-canvas");
+    const $uploadLottiePct   = document.getElementById("upload-lottie-pct");
+    const $uploadLottieLabel = document.getElementById("upload-lottie-label");
+
+    function showUploadLottie(label) {
+      // ซ่อน progress bar เดิม
+      $progressWrap.classList.add("hidden");
+      // แสดง Lottie
+      $uploadLottieWrap.classList.remove("hidden");
+      $uploadLottieLabel.textContent = label || "กำลังเตรียมไฟล์...";
+      $uploadLottiePct.textContent   = "0%";
+
+      if (!uploadLottie) {
+        uploadLottie = loadLottie($uploadLottieEl, true, true);
+      } else {
+        uploadLottie.play();
+      }
+    }
+
+    function hideUploadLottie() {
+      $uploadLottieWrap.classList.add("hidden");
+      if (uploadLottie) { uploadLottie.pause(); }
+    }
+
+    function setUploadLottieProgress(pct, label) {
+      $uploadLottiePct.textContent   = Math.round(pct) + "%";
+      $uploadLottieLabel.textContent = label || "";
+    }
+
+    // ── Override setProgress ให้ Drive Lottie display แทน ───────
+    const _origSetProgress = setProgress;
+    function setProgress(pct, label) {
+      _origSetProgress(pct, label);                    // อัปเดต fallback bar เสมอ
+      if (!$uploadLottieWrap.classList.contains("hidden")) {
+        setUploadLottieProgress(pct, label);           // อัปเดต Lottie display ด้วย
+      }
+    }
+
+    // ── Hook openUploadModal → destroy lottie เมื่อปิด ──────────
+    const _origCloseUploadModal = closeUploadModal;
+    function closeUploadModal() {
+      hideUploadLottie();
+      if (uploadLottie) { uploadLottie.destroy(); uploadLottie = null; }
+      _origCloseUploadModal();
+    }
+
+    // ════════════════════════════════════════════════
     //  INIT
     // ════════════════════════════════════════════════
-    loadGallery();
+
+    // โหลด Gallery → ปิด Splash เมื่อข้อมูลพร้อม (หรือ error)
+    async function initApp() {
+      // ป้องกัน Splash ค้างนานเกิน 4 วินาที
+      const splashTimeout = setTimeout(hideSplash, 4000);
+
+      await loadGallery();
+
+      clearTimeout(splashTimeout);
+      // รอ animation เล็กน้อยแล้วปิด splash
+      setTimeout(hideSplash, 400);
+    }
+
+    initApp();
+
+    // ── Hook Upload Submit → ใช้ Lottie แทน progress bar ────────
+    // Wrap setProgress ที่ถูก override แล้ว ให้เริ่ม showUploadLottie ก่อน
+    const _prevSetProgress = setProgress;
+    function setProgress(pct, label) {
+      // เมื่อเริ่ม upload (pct >= 10) และ lottie wrap ยังซ่อนอยู่ → เปิด
+      if (pct >= 10 && $uploadLottieWrap.classList.contains("hidden")) {
+        showUploadLottie(label);
+      }
+      _prevSetProgress(pct, label);
+    }
+
   </script>
 </body>
 </html>
