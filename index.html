@@ -969,7 +969,7 @@
     // ╔══════════════════════════════════════════════╗
     // ║  ⚙️  CONFIG — แก้ไขค่านี้เพียงจุดเดียว       ║
     // ╚══════════════════════════════════════════════╝
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzIVg6QN6VYZ4N1fv-ZmKliFGVLlPau9zJkpQ4X9NGHQTEYjaNkJQnFJZKFHcnvcxh0Fw/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyPghqA070LklU4Y7hmirLaUtKDu6ii8li7B3bWzRiNTKUMds-Gbt1kufT67SCuOd0s/exec";
     //                                                ↑ วางลิงก์ Web App ของคุณตรงนี้
 
     // ── State ──────────────────────────────────────
@@ -1368,20 +1368,20 @@
 
       uploadAborted       = false;
       $submitBtn.disabled = true;
-      $progressWrap.classList.remove("hidden");
 
       try {
+        // ── Step 0: เปิด Lottie ──────────────────────────────
+        showUploadLottie("กำลังบีบอัดรูปภาพ...");
+        setUploadProgress(10, "กำลังบีบอัดรูปภาพ...");
+
         // ── Step 1: บีบอัดรูปก่อนส่ง ──────────────────────────
-        setProgress(10, "กำลังบีบอัดรูปภาพ...");
         const { base64Data, mimeType, sizeKB } = await compressImage(selectedFile);
         if (uploadAborted) return;
 
         console.log(`[Upload] ขนาดหลังบีบอัด: ${sizeKB} KB (${mimeType})`);
-        setProgress(30, `บีบอัดเสร็จ (${sizeKB} KB) — กำลังส่ง...`);
+        setUploadProgress(30, `บีบอัดเสร็จ (${sizeKB} KB) — กำลังส่ง...`);
 
         // ── Step 2: ส่งไปยัง GAS ───────────────────────────────
-        // 🔑 FIX: ใช้ "text/plain" แทน "application/json"
-        //    เพื่อหลีกเลี่ยง CORS Preflight (OPTIONS) ที่ GAS รับไม่ได้
         const progressTimer = animateProgress(30, 88, 30000);
 
         const payload = {
@@ -1399,11 +1399,12 @@
         try {
           res = await fetch(GAS_URL, {
             method:   "POST",
-            headers:  { "Content-Type": "text/plain;charset=utf-8" }, // ✅ No preflight
+            headers:  { "Content-Type": "text/plain;charset=utf-8" },
             body:     JSON.stringify(payload),
             redirect: "follow"
           });
         } catch (networkErr) {
+          clearInterval(progressTimer);
           throw new Error("เชื่อมต่อ Server ไม่ได้ — ตรวจสอบ GAS_URL และการเชื่อมต่ออินเทอร์เน็ต");
         }
 
@@ -1411,7 +1412,6 @@
         if (uploadAborted) return;
 
         // ── Step 3: Parse Response ─────────────────────────────
-        // 🔑 FIX: ตรวจสอบว่า GAS ส่ง JSON มาจริง ไม่ใช่ HTML Error page
         const rawText = await res.text();
         let json;
         try {
@@ -1424,17 +1424,20 @@
         if (json.status !== "success") throw new Error(json.message || "อัปโหลดไม่สำเร็จ");
 
         // ── Step 4: สำเร็จ ─────────────────────────────────────
-        setProgress(100, "อัปโหลดสำเร็จ! ✅");
+        setUploadProgress(100, "อัปโหลดสำเร็จ! ✅");
         showToast("success", `✅ อัปโหลด "${title}" สำเร็จ!`);
 
         setTimeout(async () => {
-          closeUploadModal();
+          hideUploadLottie();
+          resetUploadForm();
+          const $modal = document.getElementById("upload-modal");
+          $modal.classList.add("hidden");
+          document.body.style.overflow = "";
           await loadGallery();
-        }, 900);
+        }, 1000);
 
       } catch (err) {
-        setProgress(0, "");
-        $progressWrap.classList.add("hidden");
+        hideUploadLottie();
         $submitBtn.disabled = false;
         showToast("error", "❌ " + err.message);
         console.error("[Upload Error]", err);
@@ -1444,7 +1447,7 @@
     // ── Helpers: Upload ──────────────────────────────
 
     /**
-     * compressImage: ลดขนาดรูปด้วย Canvas ก่อนส่ง (แก้ไขแล้ว)
+     * compressImage: ลดขนาดรูปด้วย Canvas ก่อนส่ง
      * - Resize ให้ไม่เกิน MAX_PX (ด้านยาวที่สุด)
      * - แปลงเป็น JPEG quality 0.82
      * - คืนค่า { base64Data, mimeType, sizeKB }
@@ -1453,93 +1456,38 @@
       return new Promise((resolve, reject) => {
         const img = new Image();
         const url = URL.createObjectURL(file);
-        
-        // ตั้ง timeout ป้องกันรูปหนาว/ไม่มี CORS
-        const timeout = setTimeout(() => {
-          URL.revokeObjectURL(url);
-          reject(new Error("ใช้เวลาโหลดรูปภาพนาน — ตรวจสอบไฟล์ CORS"));
-        }, 10000);
 
         img.onload = () => {
-          clearTimeout(timeout);
-          
-          try {
-            URL.revokeObjectURL(url);
-
-            // คำนวณขนาดใหม่ (คงอัตราส่วน)
-            let { width, height } = img;
-            console.log("[compressImage] Original size: " + width + "x" + height);
-            
-            if (width > MAX_PX || height > MAX_PX) {
-              if (width >= height) {
-                height = Math.round(height * MAX_PX / width);
-                width  = MAX_PX;
-              } else {
-                width  = Math.round(width * MAX_PX / height);
-                height = MAX_PX;
-              }
-              console.log("[compressImage] Resized to: " + width + "x" + height);
-            }
-
-            // วาดลง Canvas
-            const canvas    = document.createElement("canvas");
-            canvas.width    = width;
-            canvas.height   = height;
-            const ctx = canvas.getContext("2d");
-            
-            if (!ctx) {
-              throw new Error("ไม่สามารถสร้าง Canvas context");
-            }
-
-            // วาดรูป (ต้องใช้ drawImage มิฉะนั้น CORS อาจติดปัญหา)
-            ctx.drawImage(img, 0, 0, width, height);
-            console.log("[compressImage] Canvas drawn successfully");
-
-            // Export เป็น JPEG (ลดขนาดได้มากที่สุด)
-            let dataURL;
-            try {
-              dataURL = canvas.toDataURL("image/jpeg", QUALITY);
-            } catch (toDataURLErr) {
-              console.warn("[compressImage] toDataURL failed, trying fallback: " + toDataURLErr.message);
-              // Fallback: ลองเบอร์เซต quality ต่ำลง
-              try {
-                dataURL = canvas.toDataURL("image/jpeg", 0.6);
-              } catch (fallbackErr) {
-                throw new Error("Canvas.toDataURL ล้มเหลว: " + fallbackErr.message);
-              }
-            }
-
-            console.log("[compressImage] dataURL length: " + dataURL.length);
-
-            // Split base64
-            const parts = dataURL.split(",");
-            if (parts.length < 2) {
-              throw new Error("ไม่สามารถแยก base64 — dataURL ผิดรูปแบบ: " + dataURL.substring(0, 100));
-            }
-
-            const base64Data = parts[1];
-            if (!base64Data || base64Data.length === 0) {
-              throw new Error("base64Data ว่าง — canvas toDataURL ไม่ได้ return data");
-            }
-
-            const sizeKB = Math.round(base64Data.length * 0.75 / 1024);
-            console.log("[compressImage] Compressed size: " + sizeKB + " KB");
-
-            resolve({ base64Data, mimeType: "image/jpeg", sizeKB });
-          } catch (err) {
-            console.error("[compressImage] Error during compression: " + err.message);
-            reject(err);
-          }
-        };
-
-        img.onerror = () => {
-          clearTimeout(timeout);
           URL.revokeObjectURL(url);
-          reject(new Error("ไม่สามารถโหลดรูปภาพ — อาจเป็น CORS issue หรือรูปแบบไฟล์ไม่รองรับ"));
+
+          // คำนวณขนาดใหม่ (คงอัตราส่วน)
+          let { width, height } = img;
+          if (width > MAX_PX || height > MAX_PX) {
+            if (width >= height) {
+              height = Math.round(height * MAX_PX / width);
+              width  = MAX_PX;
+            } else {
+              width  = Math.round(width * MAX_PX / height);
+              height = MAX_PX;
+            }
+          }
+
+          // วาดลง Canvas
+          const canvas    = document.createElement("canvas");
+          canvas.width    = width;
+          canvas.height   = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Export เป็น JPEG (ลดขนาดได้มากที่สุด)
+          const dataURL    = canvas.toDataURL("image/jpeg", QUALITY);
+          const base64Data = dataURL.split(",")[1];
+          const sizeKB     = Math.round(base64Data.length * 0.75 / 1024);
+
+          resolve({ base64Data, mimeType: "image/jpeg", sizeKB });
         };
 
-        // ตั้งค่า crossOrigin เพื่อหลีกเลี่ยง CORS issue
-        img.crossOrigin = "anonymous";
+        img.onerror = () => reject(new Error("อ่านไฟล์รูปภาพไม่ได้"));
         img.src = url;
       });
     }
@@ -1556,8 +1504,7 @@
       let   current  = from;
       const id = setInterval(() => {
         current = Math.min(current + stepSize, to);
-        $progressFill.style.width = current + "%";
-        $progressPct.textContent  = Math.round(current) + "%";
+        setUploadProgress(current, "กำลังส่งข้อมูล...");
         if (current >= to) clearInterval(id);
       }, durationMs / steps);
       return id;
@@ -1704,7 +1651,6 @@
     const $splashLottie = document.getElementById("splash-lottie");
 
     function initSplash() {
-      // Render Lottie spinner ใน splash
       splashLottie = loadLottie($splashLottie, true, true);
     }
 
@@ -1717,7 +1663,6 @@
       }, 600);
     }
 
-    // เริ่ม splash ทันทีที่ JS โหลด
     initSplash();
 
     // ════════════════════════════════════════════════
@@ -1729,9 +1674,6 @@
     const $uploadLottieLabel = document.getElementById("upload-lottie-label");
 
     function showUploadLottie(label) {
-      // ซ่อน progress bar เดิม
-      $progressWrap.classList.add("hidden");
-      // แสดง Lottie
       $uploadLottieWrap.classList.remove("hidden");
       $uploadLottieLabel.textContent = label || "กำลังเตรียมไฟล์...";
       $uploadLottiePct.textContent   = "0%";
@@ -1748,26 +1690,11 @@
       if (uploadLottie) { uploadLottie.pause(); }
     }
 
-    function setUploadLottieProgress(pct, label) {
+    function setUploadProgress(pct, label) {
       $uploadLottiePct.textContent   = Math.round(pct) + "%";
       $uploadLottieLabel.textContent = label || "";
-    }
-
-    // ── Override setProgress ให้ Drive Lottie display แทน ───────
-    const _origSetProgress = setProgress;
-    function setProgress(pct, label) {
-      _origSetProgress(pct, label);                    // อัปเดต fallback bar เสมอ
-      if (!$uploadLottieWrap.classList.contains("hidden")) {
-        setUploadLottieProgress(pct, label);           // อัปเดต Lottie display ด้วย
-      }
-    }
-
-    // ── Hook openUploadModal → destroy lottie เมื่อปิด ──────────
-    const _origCloseUploadModal = closeUploadModal;
-    function closeUploadModal() {
-      hideUploadLottie();
-      if (uploadLottie) { uploadLottie.destroy(); uploadLottie = null; }
-      _origCloseUploadModal();
+      $progressFill.style.width      = pct + "%";
+      $progressPct.textContent       = Math.round(pct) + "%";
     }
 
     // ════════════════════════════════════════════════
@@ -1776,28 +1703,13 @@
 
     // โหลด Gallery → ปิด Splash เมื่อข้อมูลพร้อม (หรือ error)
     async function initApp() {
-      // ป้องกัน Splash ค้างนานเกิน 4 วินาที
       const splashTimeout = setTimeout(hideSplash, 4000);
-
       await loadGallery();
-
       clearTimeout(splashTimeout);
-      // รอ animation เล็กน้อยแล้วปิด splash
       setTimeout(hideSplash, 400);
     }
 
     initApp();
-
-    // ── Hook Upload Submit → ใช้ Lottie แทน progress bar ────────
-    // Wrap setProgress ที่ถูก override แล้ว ให้เริ่ม showUploadLottie ก่อน
-    const _prevSetProgress = setProgress;
-    function setProgress(pct, label) {
-      // เมื่อเริ่ม upload (pct >= 10) และ lottie wrap ยังซ่อนอยู่ → เปิด
-      if (pct >= 10 && $uploadLottieWrap.classList.contains("hidden")) {
-        showUploadLottie(label);
-      }
-      _prevSetProgress(pct, label);
-    }
 
   </script>
 </body>
