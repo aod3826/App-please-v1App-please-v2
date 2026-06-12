@@ -1,0 +1,485 @@
+// ============================================================
+//  Code.gs — Gallery Backend (Google Apps Script)
+//  ออกแบบสำหรับ: ระบบคลังรูปภาพกิจกรรม
+//  แผ่นงาน: 'Gallery'  |  คอลัมน์: A=Date B=Title C=Description D=Category E=ImageURL F=Status
+// ============================================================
+
+const SHEET_NAME    = "Gallery";
+const HIDDEN_STATUS = "ซ่อน";
+const SPREADSHEET_ID = "18oc4uT8bnFVgG3d6Y_b383u0p35lRlVwyZSeTHSpBZ4";  // Google Spreadsheet ID
+const FOLDER_ID      = "1RiTa1GkymfQXaY33cDnUiOpby7Y2Cpq8";             // Google Drive Folder ID
+
+// ─── Main Entry Point ─────────────────────────────────────────
+/**
+ * doGet: ถูกเรียกเมื่อมีคำขอ HTTP GET มายัง Web App URL
+ * รองรับ parameter: ?category=xxx  เพื่อกรองตามหมวดหมู่
+ */
+function doGet(e) {
+  try {
+    const params   = e && e.parameter ? e.parameter : {};
+    const category = params.category || "";          // optional filter
+    const data     = getGalleryData(category);
+
+    return buildResponse({ status: "success", count: data.length, data: data });
+  } catch (err) {
+    return buildResponse({ status: "error", message: err.message }, 500);
+  }
+}
+
+// ─── Upload Entry Point ───────────────────────────────────────
+/**
+ * doPost: รับคำขออัปโหลดรูปภาพจาก Frontend
+ * Body (JSON):
+ *   {
+ *     action:      "upload",
+ *     fileName:    "activity.jpg",
+ *     mimeType:    "image/jpeg",
+ *     base64Data:  "<base64 string>",
+ *     title:       "ชื่อกิจกรรม",
+ *     description: "รายละเอียด",
+ *     category:    "หมวดหมู่",
+ *     date:        "01/08/2567"
+ *   }
+ */
+function doPost(e) {
+  try {
+    // 🔑 FIX: รับ body จาก postData.contents (ทำงานกับทั้ง text/plain และ application/json)
+    if (!e || !e.postData || !e.postData.contents) {
+      return buildResponse({ status: "error", message: "ไม่พบ request body" });
+    }
+
+    let body;
+    try {
+      body = JSON.parse(e.postData.contents);
+    } catch (_) {
+      return buildResponse({ status: "error", message: "JSON รูปแบบไม่ถูกต้อง" });
+    }
+
+    if (body.action !== "upload") {
+      return buildResponse({ status: "error", message: "action ไม่รองรับ: " + body.action });
+    }
+
+    // ── Validate ──────────────────────────────────────────────
+    if (!body.base64Data) throw new Error("ไม่พบข้อมูลรูปภาพ (base64Data)");
+    if (!body.fileName)   throw new Error("ไม่พบชื่อไฟล์ (fileName)");
+    if (!body.title)      throw new Error("กรุณาระบุชื่อกิจกรรม (title)");
+
+    // ── อัปโหลดไฟล์ไปยัง Google Drive ───────────────────────
+    const mimeType = body.mimeType || "image/jpeg";
+    const fileId   = uploadFileToDrive(body.base64Data, mimeType, body.fileName);
+    const fileUrl  = "https://drive.google.com/file/d/" + fileId + "/view?usp=sharing";
+
+    // ── บันทึก Metadata ลง Google Sheet ─────────────────────
+    const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
+    appendRowToSheet({
+      date:        body.date        || today,
+      title:       String(body.title).trim(),
+      description: String(body.description || "").trim(),
+      category:    String(body.category    || "ทั่วไป").trim(),
+      imageUrl:    fileUrl,
+      status:      "แสดง"
+    });
+
+    return buildResponse({
+      status:   "success",
+      message:  "อัปโหลดสำเร็จ",
+      fileId:   fileId,
+      fileUrl:  fileUrl,
+      thumbUrl: "https://drive.google.com/thumbnail?id=" + fileId + "&sz=w800"
+    });
+
+  } catch (err) {
+    Logger.log("[doPost ERROR] " + err.message + "\n" + err.stack);
+    return buildResponse({ status: "error", message: err.message });
+  }
+}
+
+// ─── Helper: อัปโหลดไฟล์ Base64 ไปยัง Google Drive ──────────
+/**
+ * uploadFileToDrive: แปลง base64 → Blob แล้วบันทึกลง Drive Folder
+ * @param {string} base64Data  - ข้อมูลรูปแบบ base64 (ไม่มี prefix data:...)
+ * @param {string} mimeType    - เช่น "image/jpeg", "image/png", "image/webp"
+ * @param {string} fileName    - ชื่อไฟล์ เช่น "activity.jpg"
+ * @returns {string} fileId    - Google Drive File ID
+ */
+function uploadFileToDrive(base64Data, mimeType, fileName) {
+  // ตรวจสอบขนาดไฟล์ (Base64 ~1.37x ของขนาดจริง) — จำกัดไว้ที่ 10MB
+  const MAX_BYTES = 10 * 1024 * 1024;
+  const approxSize = Math.ceil(base64Data.length * 0.75);
+  if (approxSize > MAX_BYTES) {
+    throw new Error("ไฟล์มีขนาดใหญ่เกิน 10MB (" + (approxSize / 1024 / 1024).toFixed(1) + "MB)");
+  }
+
+  // แปลง Base64 → Blob
+  const blob = Utilities.newBlob(
+    Utilities.base64Decode(base64Data),
+    mimeType,
+    fileName
+  );
+
+  // บันทึกลง Folder ที่กำหนด
+  const folder = DriveApp.getFolderById(FOLDER_ID);
+  const file   = folder.createFile(blob);
+
+  // ตั้งสิทธิ์ให้ "ทุกคนที่มีลิงก์" ดูได้ (จำเป็นสำหรับแสดงรูปบนเว็บ)
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  Logger.log("[Upload] บันทึกไฟล์สำเร็จ: " + file.getName() + " (ID: " + file.getId() + ")");
+  return file.getId();
+}
+
+// ─── Helper: เพิ่มแถวข้อมูลใหม่ใน Gallery Sheet ─────────────
+/**
+ * appendRowToSheet: เพิ่มแถวใหม่ต่อท้าย Sheet
+ * @param {Object} data - { date, title, description, category, imageUrl, status }
+ */
+function appendRowToSheet(data) {
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+  if (!sheet) throw new Error("ไม่พบแผ่นงาน '" + SHEET_NAME + "'");
+
+  sheet.appendRow([
+    data.date,
+    data.title,
+    data.description,
+    data.category,
+    data.imageUrl,
+    data.status
+  ]);
+
+  // จัดรูปแบบแถวที่เพิ่งเพิ่ม
+  const newRow = sheet.getLastRow();
+  sheet.getRange(newRow, 1, 1, 6)
+    .setVerticalAlignment("middle")
+    .setWrap(false);
+
+  Logger.log("[Sheet] เพิ่มแถว " + newRow + ": " + data.title);
+}
+
+// ─── Core Data Function ───────────────────────────────────────
+/**
+ * getGalleryData: อ่านข้อมูลจากแผ่นงาน Gallery แล้วส่งคืนเป็น Array ของ Object
+ * @param {string} filterCategory - กรองตามหมวดหมู่ (ถ้าว่างจะดึงทั้งหมด)
+ * @returns {Array<Object>}
+ */
+function getGalleryData(filterCategory) {
+  const sheet  = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+  if (!sheet) throw new Error("ไม่พบแผ่นงานชื่อ '" + SHEET_NAME + "' กรุณาตรวจสอบชื่อแผ่นงาน");
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];                        // ไม่มีข้อมูล (มีแค่ header)
+
+  // อ่านข้อมูลทั้งหมดตั้งแต่แถวที่ 2 (ข้ามหัวตาราง)
+  const range  = sheet.getRange(2, 1, lastRow - 1, 6);
+  const values = range.getValues();
+
+  const results = [];
+
+  values.forEach(function (row, index) {
+    const date        = row[0];
+    const title       = row[1];
+    const description = row[2];
+    const category    = row[3];
+    const imageUrl    = row[4];
+    const status      = row[5];
+
+    // ── 1. ข้ามแถวที่มีสถานะ "ซ่อน" ──
+    if (String(status).trim() === HIDDEN_STATUS) return;
+
+    // ── 2. ข้ามแถวที่ไม่มี URL รูปภาพ ──
+    if (!imageUrl) return;
+
+    // ── 3. กรองตาม Category (ถ้ามีการระบุ) ──
+    if (filterCategory && String(category).trim() !== filterCategory.trim()) return;
+
+    // ── 4. แปลงวันที่ให้เป็น string ISO (ป้องกัน Date object) ──
+    let dateStr = "";
+    if (date instanceof Date) {
+      dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), "dd/MM/yyyy");
+    } else {
+      dateStr = String(date).trim();
+    }
+
+    results.push({
+      id:          index + 2,                          // row number (อ้างอิง)
+      date:        dateStr,
+      title:       String(title).trim(),
+      description: String(description).trim(),
+      category:    String(category).trim(),
+      imageUrl:    convertDriveUrl(String(imageUrl).trim()),
+      status:      String(status).trim()
+    });
+  });
+
+  return results;
+}
+
+// ─── Helper: แปลง Google Drive Share URL → Direct Image URL ──
+/**
+ * convertDriveUrl: แปลงลิงก์ Google Drive รูปแบบต่างๆ ให้เป็น direct thumbnail URL
+ * รองรับรูปแบบ:
+ *   https://drive.google.com/file/d/FILE_ID/view
+ *   https://drive.google.com/open?id=FILE_ID
+ *   https://drive.google.com/uc?id=FILE_ID
+ *   https://docs.google.com/uc?id=FILE_ID
+ *   ลิงก์ปกติอื่น ๆ จะส่งคืนตามเดิม
+ */
+function convertDriveUrl(url) {
+  if (!url) return url;
+
+  // รูปแบบ: /file/d/{FILE_ID}/
+  const match1 = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (match1) {
+    return "https://drive.google.com/thumbnail?id=" + match1[1] + "&sz=w800";
+  }
+
+  // รูปแบบ: ?id={FILE_ID} หรือ &id={FILE_ID}
+  const match2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (match2) {
+    return "https://drive.google.com/thumbnail?id=" + match2[1] + "&sz=w800";
+  }
+
+  // ลิงก์อื่น ๆ ส่งคืนตามเดิม
+  return url;
+}
+
+// ─── Helper: สร้าง JSON Response พร้อม CORS Header ────────────
+function buildResponse(payload, statusCode) {
+  const json = ContentService
+    .createTextOutput(JSON.stringify(payload))
+    .setMimeType(ContentService.MimeType.JSON);
+  return json;                                         // GAS ไม่รองรับ custom status code
+}
+
+// ─── Utility: ฟังก์ชันทดสอบใน Apps Script Editor ─────────────
+/**
+ * testGetGalleryData: รันใน Apps Script Editor เพื่อทดสอบ
+ * ผลลัพธ์จะแสดงใน Execution log
+ */
+function testGetGalleryData() {
+  const data = getGalleryData("");
+  Logger.log("จำนวนแถวที่ดึงได้: " + data.length);
+  Logger.log(JSON.stringify(data.slice(0, 3), null, 2));
+}
+
+// ─── Utility: ติดตั้งระบบครั้งแรก (Initial Setup) ────────────
+/**
+ * setupSheets: เรียกครั้งเดียวตอนติดตั้งระบบ
+ * สิ่งที่ฟังก์ชันนี้ทำ:
+ *   1. สร้าง/ตรวจสอบแผ่นงาน 'Gallery'
+ *   2. ตั้งหัวตาราง + จัดรูปแบบ (freeze, bold, สีพื้นหลัง)
+ *   3. ตั้ง Data Validation คอลัมน์ Status (แสดง / ซ่อน)
+ *   4. ตั้ง Data Validation คอลัมน์ Date (Date picker)
+ *   5. ป้องกันแถว Header ไม่ให้แก้ไขโดยไม่ตั้งใจ
+ *   6. ตั้ง Column Width ให้เหมาะสม
+ *   7. ตรวจสอบว่า Drive Folder ที่กำหนดมีอยู่จริง
+ *   8. แสดงสรุปผลใน Alert
+ */
+function setupSheets() {
+  const ss      = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ui      = SpreadsheetApp.getUi();
+  const log     = [];   // เก็บ log แต่ละขั้นตอน
+  let   sheet;
+
+  // ── STEP 1: สร้าง / หา Sheet Gallery ───────────────────────
+  sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+    log.push("✅ สร้างแผ่นงาน '" + SHEET_NAME + "' ใหม่");
+  } else {
+    log.push("ℹ️  พบแผ่นงาน '" + SHEET_NAME + "' อยู่แล้ว (ไม่ถูก Clear)");
+  }
+
+  // ── STEP 2: หัวตาราง + จัดรูปแบบ ───────────────────────────
+  const HEADERS = [
+    { label: "Date",        note: "รูปแบบ dd/MM/yyyy เช่น 01/08/2567" },
+    { label: "Title",       note: "ชื่อกิจกรรม (แสดงบนการ์ด)" },
+    { label: "Description", note: "รายละเอียดกิจกรรม (แสดงใน Lightbox)" },
+    { label: "Category",    note: "หมวดหมู่ เช่น อบรม/สัมมนา, งานประเพณี, ประชุม" },
+    { label: "ImageURL",    note: "URL รูปภาพ หรือ Google Drive Share Link" },
+    { label: "Status",      note: "แสดง = แสดงบนเว็บ | ซ่อน = ซ่อนจากหน้าเว็บ" },
+  ];
+
+  const COL_WIDTHS = [110, 220, 320, 130, 380, 80];
+
+  const headerRow = sheet.getRange(1, 1, 1, HEADERS.length);
+
+  // ตั้งค่า Label
+  headerRow.setValues([HEADERS.map(h => h.label)]);
+
+  // Style หัวตาราง
+  headerRow
+    .setFontFamily("Kanit")
+    .setFontSize(11)
+    .setFontWeight("bold")
+    .setFontColor("#FFFFFF")
+    .setBackground("#1a1a2e")
+    .setHorizontalAlignment("center")
+    .setVerticalAlignment("middle")
+    .setWrap(false);
+
+  // ตั้ง Note (คำอธิบาย) ในแต่ละหัวคอลัมน์
+  HEADERS.forEach((h, i) => {
+    sheet.getRange(1, i + 1).setNote(h.note);
+  });
+
+  // ตั้งความสูงแถว header
+  sheet.setRowHeight(1, 36);
+
+  // ตั้งความกว้างคอลัมน์
+  COL_WIDTHS.forEach((w, i) => sheet.setColumnWidth(i + 1, w));
+
+  log.push("✅ ตั้งหัวตาราง + จัดรูปแบบเรียบร้อย");
+
+  // ── STEP 3: Freeze แถวหัวตาราง ──────────────────────────────
+  sheet.setFrozenRows(1);
+  sheet.setFrozenColumns(1);       // ตรึงคอลัมน์ Date ด้วย
+  log.push("✅ Freeze แถวหัวตาราง + คอลัมน์แรกแล้ว");
+
+  // ── STEP 4: Data Validation — คอลัมน์ F (Status) ────────────
+  const statusRange = sheet.getRange(2, 6, 999, 1);
+  const statusRule  = SpreadsheetApp.newDataValidation()
+    .requireValueInList(["แสดง", "ซ่อน"], true)
+    .setAllowInvalid(false)
+    .setHelpText("เลือก 'แสดง' เพื่อให้รูปปรากฏบนเว็บ หรือ 'ซ่อน' เพื่อซ่อน")
+    .build();
+  statusRange.setDataValidation(statusRule);
+
+  // ตั้งค่าเริ่มต้น "แสดง" ให้แถวที่ว่าง (optional — ช่วยลดความผิดพลาด)
+  // ใช้ Conditional Formatting แทนเพื่อไม่ overwrite ข้อมูลเดิม
+  log.push("✅ ตั้ง Dropdown Validation คอลัมน์ Status (แสดง/ซ่อน)");
+
+  // ── STEP 5: Conditional Formatting ─────────────────────────
+  //  แถวสถานะ "ซ่อน"  → ตัวอักษรสีเทา
+  //  แถวสถานะ "แสดง"  → พื้นหลังเขียวอ่อน
+  const cfRules = [];
+  const dataRange = sheet.getRange("A2:F1000");
+
+  // Rule 1: Status = "ซ่อน" → แถวสีเทา
+  cfRules.push(
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=$F2="ซ่อน"')
+      .setFontColor("#9E9E9E")
+      .setBackground("#F5F5F5")
+      .setRanges([dataRange])
+      .build()
+  );
+
+  // Rule 2: Status = "แสดง" → แถวสีเขียวอ่อน
+  cfRules.push(
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=$F2="แสดง"')
+      .setBackground("#E8F5E9")
+      .setRanges([dataRange])
+      .build()
+  );
+
+  sheet.setConditionalFormatRules(cfRules);
+  log.push("✅ ตั้ง Conditional Formatting (เขียว=แสดง, เทา=ซ่อน)");
+
+  // ── STEP 6: ป้องกัน Header Row ──────────────────────────────
+  // ลบ Protection เดิมที่อาจมีอยู่ก่อน (ป้องกัน duplicate)
+  sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE)
+    .forEach(p => { try { p.remove(); } catch(e) {} });
+
+  const protection = sheet.getRange(1, 1, 1, HEADERS.length)
+    .protect()
+    .setDescription("Gallery Header — ห้ามแก้ไข");
+
+  // อนุญาตเฉพาะเจ้าของไฟล์แก้ไขได้
+  protection.removeEditors(protection.getEditors());
+  if (protection.canDomainEdit()) protection.setDomainEdit(false);
+
+  log.push("✅ ป้องกันแถว Header (เฉพาะเจ้าของแก้ไขได้)");
+
+  // ── STEP 7: ตั้งค่า Alternating Row Colors (สำรอง CF) ───────
+  // Note: บางครั้ง CF override banding ดังนั้นใช้เฉพาะเพื่อ UX
+  try {
+    const existingBandings = sheet.getBandings();
+    existingBandings.forEach(b => b.remove());
+    sheet.getRange("A1:F1000").applyRowBanding(
+      SpreadsheetApp.BandingTheme.LIGHT_GREY
+    );
+    log.push("✅ ตั้ง Alternating Row Colors");
+  } catch(e) {
+    log.push("⚠️  ข้าม Banding (อาจมีข้อขัดแย้งกับ CF)");
+  }
+
+  // ── STEP 8: ตรวจสอบ Drive Folder ────────────────────────────
+  try {
+    const folder = DriveApp.getFolderById(FOLDER_ID);
+    log.push("✅ Drive Folder พบแล้ว: \"" + folder.getName() + "\"");
+  } catch(e) {
+    log.push("⚠️  ไม่พบ Drive Folder ID: " + FOLDER_ID + " — กรุณาตรวจสอบ");
+  }
+
+  // ── STEP 9: ตั้งชื่อ Named Range เพื่ออ้างอิงง่าย ──────────
+  try {
+    // ลบ Named Range เดิม (ถ้ามี)
+    ss.getNamedRanges()
+      .filter(nr => nr.getName() === "GalleryData")
+      .forEach(nr => nr.remove());
+
+    ss.setNamedRange("GalleryData", sheet.getRange("A:F"));
+    log.push("✅ ตั้ง Named Range 'GalleryData' → คอลัมน์ A:F");
+  } catch(e) {
+    log.push("⚠️  ไม่สามารถตั้ง Named Range: " + e.message);
+  }
+
+  // ── FINAL: แสดงผลสรุป ───────────────────────────────────────
+  const summary = [
+    "══════════════════════════════",
+    "  🛠️  setupSheets() สำเร็จ",
+    "══════════════════════════════",
+    "",
+    ...log,
+    "",
+    "──────────────────────────────",
+    "📌  ขั้นตอนถัดไป:",
+    "  1. กรอกข้อมูลในแผ่นงาน Gallery",
+    "     (หรือรัน createSampleData())",
+    "  2. Deploy Web App → Copy URL",
+    "  3. วาง URL ใน index.html",
+    "══════════════════════════════",
+  ].join("\n");
+
+  Logger.log(summary);
+  ui.alert("Setup เสร็จสมบูรณ์ 🎉", summary, ui.ButtonSet.OK);
+}
+
+// ─── Utility: สร้างข้อมูลตัวอย่าง (Sample Data) ───────────────
+/**
+ * createSampleData: เรียกใช้ครั้งเดียวเพื่อสร้างข้อมูลตัวอย่างใน Sheet
+ * ⚠️ จะ Clear ข้อมูลเดิมทั้งหมดใน Gallery Sheet
+ */
+function createSampleData() {
+  const ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet   = ss.getSheetByName(SHEET_NAME);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+  } else {
+    sheet.clearContents();
+  }
+
+  const headers = ["Date", "Title", "Description", "Category", "ImageURL", "Status"];
+  const samples = [
+    ["01/05/2567", "วันแรงงานแห่งชาติ",        "กิจกรรมวันแรงงาน ณ ลานกลางแจ้ง",        "งานประเพณี",   "https://picsum.photos/seed/farm1/800/600",  "แสดง"],
+    ["15/06/2567", "โครงการอบรมเกษตรกร",       "อบรมการเลี้ยงสัตว์อย่างยั่งยืน",          "อบรม/สัมมนา",  "https://picsum.photos/seed/farm2/800/600",  "แสดง"],
+    ["20/06/2567", "ทดสอบซ่อนรูปนี้",          "แถวนี้ควรถูกซ่อน",                       "ทั่วไป",        "https://picsum.photos/seed/farm3/800/600",  "ซ่อน"],
+    ["01/07/2567", "ประชุมสมาชิกสหกรณ์",       "ประชุมประจำไตรมาสสมาชิกสหกรณ์",          "ประชุม",        "https://picsum.photos/seed/farm4/800/600",  "แสดง"],
+    ["10/07/2567", "ลงพื้นที่ดูแลฟาร์ม",        "ทีมสัตวแพทย์เยี่ยมฟาร์มสมาชิก",           "ลงพื้นที่",     "https://picsum.photos/seed/farm5/800/600",  "แสดง"],
+    ["25/07/2567", "งานเกษตรแฟร์ประจำปี",      "แสดงนิทรรศการผลผลิตทางการเกษตร",         "งานประเพณี",   "https://picsum.photos/seed/farm6/800/600",  "แสดง"],
+    ["05/08/2567", "อบรม IoT ฟาร์มอัจฉริยะ",    "เรียนรู้การใช้เซนเซอร์ในฟาร์มสมัยใหม่",   "อบรม/สัมมนา",  "https://picsum.photos/seed/farm7/800/600",  "แสดง"],
+    ["18/08/2567", "พิธีมอบวุฒิบัตรเกษตรกร",   "มอบวุฒิบัตรหลักสูตรการเกษตร",            "พิธีการ",       "https://picsum.photos/seed/farm8/800/600",  "แสดง"],
+  ];
+
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+    .setFontWeight("bold")
+    .setBackground("#1a1a2e")
+    .setFontColor("#ffffff");
+
+  sheet.getRange(2, 1, samples.length, headers.length).setValues(samples);
+  sheet.autoResizeColumns(1, headers.length);
+
+  SpreadsheetApp.getUi().alert("✅ สร้างข้อมูลตัวอย่าง " + samples.length + " แถวเรียบร้อย!");
+}
