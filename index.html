@@ -1444,7 +1444,7 @@
     // ── Helpers: Upload ──────────────────────────────
 
     /**
-     * compressImage: ลดขนาดรูปด้วย Canvas ก่อนส่ง
+     * compressImage: ลดขนาดรูปด้วย Canvas ก่อนส่ง (แก้ไขแล้ว)
      * - Resize ให้ไม่เกิน MAX_PX (ด้านยาวที่สุด)
      * - แปลงเป็น JPEG quality 0.82
      * - คืนค่า { base64Data, mimeType, sizeKB }
@@ -1453,38 +1453,93 @@
       return new Promise((resolve, reject) => {
         const img = new Image();
         const url = URL.createObjectURL(file);
+        
+        // ตั้ง timeout ป้องกันรูปหนาว/ไม่มี CORS
+        const timeout = setTimeout(() => {
+          URL.revokeObjectURL(url);
+          reject(new Error("ใช้เวลาโหลดรูปภาพนาน — ตรวจสอบไฟล์ CORS"));
+        }, 10000);
 
         img.onload = () => {
-          URL.revokeObjectURL(url);
+          clearTimeout(timeout);
+          
+          try {
+            URL.revokeObjectURL(url);
 
-          // คำนวณขนาดใหม่ (คงอัตราส่วน)
-          let { width, height } = img;
-          if (width > MAX_PX || height > MAX_PX) {
-            if (width >= height) {
-              height = Math.round(height * MAX_PX / width);
-              width  = MAX_PX;
-            } else {
-              width  = Math.round(width * MAX_PX / height);
-              height = MAX_PX;
+            // คำนวณขนาดใหม่ (คงอัตราส่วน)
+            let { width, height } = img;
+            console.log("[compressImage] Original size: " + width + "x" + height);
+            
+            if (width > MAX_PX || height > MAX_PX) {
+              if (width >= height) {
+                height = Math.round(height * MAX_PX / width);
+                width  = MAX_PX;
+              } else {
+                width  = Math.round(width * MAX_PX / height);
+                height = MAX_PX;
+              }
+              console.log("[compressImage] Resized to: " + width + "x" + height);
             }
+
+            // วาดลง Canvas
+            const canvas    = document.createElement("canvas");
+            canvas.width    = width;
+            canvas.height   = height;
+            const ctx = canvas.getContext("2d");
+            
+            if (!ctx) {
+              throw new Error("ไม่สามารถสร้าง Canvas context");
+            }
+
+            // วาดรูป (ต้องใช้ drawImage มิฉะนั้น CORS อาจติดปัญหา)
+            ctx.drawImage(img, 0, 0, width, height);
+            console.log("[compressImage] Canvas drawn successfully");
+
+            // Export เป็น JPEG (ลดขนาดได้มากที่สุด)
+            let dataURL;
+            try {
+              dataURL = canvas.toDataURL("image/jpeg", QUALITY);
+            } catch (toDataURLErr) {
+              console.warn("[compressImage] toDataURL failed, trying fallback: " + toDataURLErr.message);
+              // Fallback: ลองเบอร์เซต quality ต่ำลง
+              try {
+                dataURL = canvas.toDataURL("image/jpeg", 0.6);
+              } catch (fallbackErr) {
+                throw new Error("Canvas.toDataURL ล้มเหลว: " + fallbackErr.message);
+              }
+            }
+
+            console.log("[compressImage] dataURL length: " + dataURL.length);
+
+            // Split base64
+            const parts = dataURL.split(",");
+            if (parts.length < 2) {
+              throw new Error("ไม่สามารถแยก base64 — dataURL ผิดรูปแบบ: " + dataURL.substring(0, 100));
+            }
+
+            const base64Data = parts[1];
+            if (!base64Data || base64Data.length === 0) {
+              throw new Error("base64Data ว่าง — canvas toDataURL ไม่ได้ return data");
+            }
+
+            const sizeKB = Math.round(base64Data.length * 0.75 / 1024);
+            console.log("[compressImage] Compressed size: " + sizeKB + " KB");
+
+            resolve({ base64Data, mimeType: "image/jpeg", sizeKB });
+          } catch (err) {
+            console.error("[compressImage] Error during compression: " + err.message);
+            reject(err);
           }
-
-          // วาดลง Canvas
-          const canvas    = document.createElement("canvas");
-          canvas.width    = width;
-          canvas.height   = height;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0, width, height);
-
-          // Export เป็น JPEG (ลดขนาดได้มากที่สุด)
-          const dataURL    = canvas.toDataURL("image/jpeg", QUALITY);
-          const base64Data = dataURL.split(",")[1];
-          const sizeKB     = Math.round(base64Data.length * 0.75 / 1024);
-
-          resolve({ base64Data, mimeType: "image/jpeg", sizeKB });
         };
 
-        img.onerror = () => reject(new Error("อ่านไฟล์รูปภาพไม่ได้"));
+        img.onerror = () => {
+          clearTimeout(timeout);
+          URL.revokeObjectURL(url);
+          reject(new Error("ไม่สามารถโหลดรูปภาพ — อาจเป็น CORS issue หรือรูปแบบไฟล์ไม่รองรับ"));
+        };
+
+        // ตั้งค่า crossOrigin เพื่อหลีกเลี่ยง CORS issue
+        img.crossOrigin = "anonymous";
         img.src = url;
       });
     }
