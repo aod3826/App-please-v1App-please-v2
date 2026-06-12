@@ -1,6 +1,4 @@
-
-# Create the corrected index.html - Part 1 (HTML head and body structure)
-index_html_part1 = '''<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
@@ -670,6 +668,7 @@ index_html_part1 = '''<!DOCTYPE html>
       color: #22c55e;
     }
   </style>
+<base target="_blank">
 </head>
 
 <body>
@@ -964,16 +963,7 @@ index_html_part1 = '''<!DOCTYPE html>
   <footer class="relative z-10 border-t border-dark-700/50 py-6 text-center">
     <p class="font-prompt text-xs text-dark-500">Gallery System · Powered by Google Apps Script</p>
   </footer>
-'''
 
-with open('/mnt/agents/output/index.html', 'w', encoding='utf-8') as f:
-    f.write(index_html_part1)
-
-print("Part 1 written successfully")
-print(f"Length: {len(index_html_part1)} chars")
-
-# Continue with JavaScript part - the corrected upload system
-index_html_js = '''
 
   <!-- ══════════════════ JAVASCRIPT ══════════════════ -->
   <script>
@@ -1017,7 +1007,7 @@ index_html_js = '''
       try {
         // ── ตรวจสอบว่าผู้ใช้ยังไม่ได้ตั้งค่า URL ──
         if (GAS_URL.includes("YOUR_DEPLOYMENT_ID")) {
-          throw new Error("กรุณาตั้งค่า GAS_URL ในไฟล์ index.html ก่อนใช้งาน\\n(แทนที่ YOUR_DEPLOYMENT_ID ด้วย Web App URL จริง)");
+          throw new Error("กรุณาตั้งค่า GAS_URL ในไฟล์ index.html ก่อนใช้งาน\n(แทนที่ YOUR_DEPLOYMENT_ID ด้วย Web App URL จริง)");
         }
 
         const res  = await fetch(GAS_URL, { redirect: "follow" });
@@ -1351,7 +1341,7 @@ index_html_js = '''
       $submitBtn.disabled = false;
 
       if (!$upTitle.value) {
-        $upTitle.placeholder = file.name.replace(/\\.[^.]+$/, "").replace(/[-_]/g, " ");
+        $upTitle.placeholder = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
       }
     }
 
@@ -1383,7 +1373,7 @@ index_html_js = '''
         // Step 2: Send to GAS
         const payload = {
           action:      "upload",
-          fileName:    selectedFile.name.replace(/[^\\w.\\-]/g, "_"),
+          fileName:    selectedFile.name.replace(/[^\w.\-]/g, "_"),
           mimeType:    mimeType,
           base64Data:  base64Data,
           title:       title,
@@ -1415,7 +1405,8 @@ index_html_js = '''
         try {
           json = JSON.parse(rawText);
         } catch (_) {
-          console.error("[Upload] GAS ตอบกลับไม่ใช่ JSON:\n", rawText.slice(0, 500));
+          console.error("[Upload] GAS ตอบกลับไม่ใช่ JSON:
+", rawText.slice(0, 500));
           throw new Error("GAS ตอบกลับผิดรูปแบบ — กรุณา Redeploy Web App แบบ 'New Version' และตรวจสอบว่า 'Execute as: Me' และ 'Who has access: Anyone'");
         }
 
@@ -1464,7 +1455,7 @@ index_html_js = '''
           canvas.width    = width;
           canvas.height   = height;
           const ctx = canvas.getContext("2d");
-          
+
           // ใส่พื้นหลังสีขาวก่อนวาด (ป้องกัน PNG โปร่งใสกลายเป็นดำ)
           ctx.fillStyle = "#FFFFFF";
           ctx.fillRect(0, 0, width, height);
@@ -1492,7 +1483,7 @@ index_html_js = '''
       $progressFill.style.width  = pct + "%";
       $progressPct.textContent   = pct + "%";
       if (label) $progressLabel.textContent = label;
-      
+
       // Update Lottie display if visible
       if (!$uploadLottieWrap.classList.contains("hidden")) {
         setUploadLottieProgress(pct, label);
@@ -1707,10 +1698,3 @@ index_html_js = '''
   </script>
 </body>
 </html>
-'''
-
-# Append to existing file
-with open('/mnt/agents/output/index.html', 'a', encoding='utf-8') as f:
-    f.write(index_html_js)
-
-print("index.html completed successfully")
