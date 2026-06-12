@@ -1,4 +1,6 @@
-<!DOCTYPE html>
+
+# Create the corrected index.html - Part 1 (HTML head and body structure)
+index_html_part1 = '''<!DOCTYPE html>
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
@@ -924,7 +926,7 @@
           <div id="upload-lottie-label">กำลังเตรียมไฟล์...</div>
         </div>
 
-        <!-- Progress bar (สำรองเมื่อ Lottie โหลดไม่ได้) -->
+        <!-- Progress bar (fallback when Lottie fails) -->
         <div id="upload-progress-wrap" class="hidden">
           <div class="flex items-center justify-between mb-1.5">
             <span id="upload-progress-label" class="text-xs text-dark-400 font-prompt">กำลังอัปโหลด...</span>
@@ -960,21 +962,30 @@
 
   <!-- ══════════════════ FOOTER ══════════════════ -->
   <footer class="relative z-10 border-t border-dark-700/50 py-6 text-center">
-    <p class="font-prompt text-xs text-dark-500">Gallery System • Powered by Google Apps Script</p>
+    <p class="font-prompt text-xs text-dark-500">Gallery System · Powered by Google Apps Script</p>
   </footer>
+'''
 
+with open('/mnt/agents/output/index.html', 'w', encoding='utf-8') as f:
+    f.write(index_html_part1)
+
+print("Part 1 written successfully")
+print(f"Length: {len(index_html_part1)} chars")
+
+# Continue with JavaScript part - the corrected upload system
+index_html_js = '''
 
   <!-- ══════════════════ JAVASCRIPT ══════════════════ -->
   <script>
     // ╔══════════════════════════════════════════════╗
-    // ║  ⚙️  CONFIG — ใส่ Web App URL ของคุณตรงนี้   ║
+    // ║  ⚙️  CONFIG — แก้ไขค่านี้เพียงจุดเดียว       ║
     // ╚══════════════════════════════════════════════╝
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzIVg6QN6VYZ4N1fv-ZmKliFGVLlPau9zJkpQ4X9NGHQTEYjaNkJQnFJZKFHcnvcxh0Fw/exec";
-    //                                                ↑ วางลิงก์ Web App ที่ Deploy ใหม่
+    //                                                ↑ วางลิงก์ Web App ของคุณตรงนี้
 
     // ── State ──────────────────────────────────────
-    let allItems        = [];
-    let filteredItems   = [];
+    let allItems        = [];   // ข้อมูลทั้งหมดจาก GAS
+    let filteredItems   = [];   // หลังกรอง
     let currentCat      = "__all__";
     let currentSearch   = "";
     let lightboxIndex   = 0;
@@ -1004,8 +1015,9 @@
     async function loadGallery() {
       showState("loading");
       try {
+        // ── ตรวจสอบว่าผู้ใช้ยังไม่ได้ตั้งค่า URL ──
         if (GAS_URL.includes("YOUR_DEPLOYMENT_ID")) {
-          throw new Error("กรุณาตั้งค่า GAS_URL ในไฟล์ index.html ก่อนใช้งาน");
+          throw new Error("กรุณาตั้งค่า GAS_URL ในไฟล์ index.html ก่อนใช้งาน\\n(แทนที่ YOUR_DEPLOYMENT_ID ด้วย Web App URL จริง)");
         }
 
         const res  = await fetch(GAS_URL, { redirect: "follow" });
@@ -1210,7 +1222,7 @@
     }
 
     // ════════════════════════════════════════════════
-    //  UPLOAD SYSTEM (ใช้ FormData ไม่มี CORS Preflight)
+    //  UPLOAD SYSTEM
     // ════════════════════════════════════════════════
     const $uploadModal    = document.getElementById("upload-modal");
     const $dropZone       = document.getElementById("drop-zone");
@@ -1235,7 +1247,7 @@
 
     // ── เปิด/ปิด Modal ──────────────────────────────
     document.getElementById("btn-open-upload").addEventListener("click", openUploadModal);
-    document.getElementById("upload-close").addEventListener("click",     closeUploadModal);
+    document.getElementById("upload-close").addEventListener("click", closeUploadModal);
     document.getElementById("upload-cancel-btn").addEventListener("click", closeUploadModal);
     $uploadModal.addEventListener("click", e => { if (e.target === $uploadModal) closeUploadModal(); });
 
@@ -1256,10 +1268,11 @@
 
     function closeUploadModal() {
       uploadAborted = true;
+      hideUploadLottie();
+      if (uploadLottie) { uploadLottie.destroy(); uploadLottie = null; }
       $uploadModal.classList.add("hidden");
       document.body.style.overflow = "";
       resetUploadForm();
-      hideUploadLottie();
     }
 
     function resetUploadForm() {
@@ -1282,8 +1295,7 @@
         </svg>อัปโหลด`;
     }
 
-    // ── Category Custom Logic ───────────────────────
-    // เพิ่มตัวเลือก "พิมพ์หมวดหมู่ใหม่"
+    // ── Category custom input ────────────────────────
     const optOther = document.createElement("option");
     optOther.value = "__custom__";
     optOther.textContent = "➕ พิมพ์หมวดหมู่ใหม่...";
@@ -1293,7 +1305,7 @@
       $upCatCustom.style.display = $upCategory.value === "__custom__" ? "block" : "none";
     });
 
-    // ── Drag & Drop ─────────────────────────────────
+    // ── Drag & Drop ──────────────────────────────────
     $dropZone.addEventListener("dragover",  e => { e.preventDefault(); $dropZone.classList.add("dragover"); });
     $dropZone.addEventListener("dragleave", ()  => $dropZone.classList.remove("dragover"));
     $dropZone.addEventListener("drop", e => {
@@ -1321,8 +1333,8 @@
         showToast("error", "❌ รองรับเฉพาะ JPG, PNG, WEBP, GIF เท่านั้น");
         return;
       }
-      if (file.size > 10 * 1024 * 1024) {
-        showToast("error", "❌ ไฟล์ใหญ่เกิน 10MB");
+      if (file.size > 20 * 1024 * 1024) {
+        showToast("error", "❌ ไฟล์ต้นฉบับใหญ่เกิน 20MB");
         return;
       }
 
@@ -1333,17 +1345,17 @@
       $previewImg.src   = previewURL;
       $previewWrap.classList.remove("hidden");
 
-      const sizeKB = (file.size / 1024).toFixed(0);
-      $previewName.textContent = `${file.name} (${sizeKB} KB)`;
+      const origKB = (file.size / 1024).toFixed(0);
+      $previewName.textContent = `${file.name} (ต้นฉบับ ${origKB} KB — จะถูกบีบอัดก่อนส่ง)`;
 
       $submitBtn.disabled = false;
 
       if (!$upTitle.value) {
-        $upTitle.placeholder = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
+        $upTitle.placeholder = file.name.replace(/\\.[^.]+$/, "").replace(/[-_]/g, " ");
       }
     }
 
-    // ── Submit Upload ด้วย FormData ─────────────────
+    // ── Submit Upload ────────────────────────────────
     $submitBtn.addEventListener("click", async () => {
       if (!selectedFile)  { showToast("error", "❌ กรุณาเลือกรูปภาพก่อน"); return; }
       const title = $upTitle.value.trim();
@@ -1354,65 +1366,73 @@
         : $upCategory.value.trim();
       if (!category) category = "ทั่วไป";
 
-      uploadAborted = false;
+      uploadAborted       = false;
       $submitBtn.disabled = true;
-      
-      // ใช้ Lottie Animation แทน progress bar
-      showUploadLottie("กำลังอัปโหลด...");
-      
-      // สร้าง FormData
-      const formData = new FormData();
-      formData.append('action', 'upload');
-      formData.append('fileName', selectedFile.name.replace(/[\\/*?:"<>|]/g, "_"));
-      formData.append('title', title);
-      formData.append('description', $upDesc.value.trim());
-      formData.append('category', category);
-      formData.append('date', $upDate.value.trim());
-      formData.append('imageFile', selectedFile);
-      
-      // จำลองความคืบหน้า (fetch ไม่มี onprogress)
-      let progressInterval = setInterval(() => {
-        const currentPct = parseInt($uploadLottiePct.textContent) || 0;
-        if (currentPct < 90) {
-          const newPct = Math.min(currentPct + 12, 90);
-          $uploadLottiePct.textContent = newPct + "%";
-          $uploadLottieLabel.textContent = "กำลังส่งข้อมูล... " + newPct + "%";
-        }
-      }, 800);
-      
+      $progressWrap.classList.remove("hidden");
+      showUploadLottie("กำลังเตรียมไฟล์...");
+
       try {
-        const res = await fetch(GAS_URL, {
-          method: "POST",
-          body: formData,   // ไม่ต้องตั้ง Content-Type (browser จะตั้ง boundary ให้)
-          redirect: "follow"
-        });
-        
-        clearInterval(progressInterval);
-        
+        // Step 1: Compress
+        setProgress(10, "กำลังบีบอัดรูปภาพ...");
+        const { base64Data, mimeType, sizeKB } = await compressImage(selectedFile);
         if (uploadAborted) return;
-        
+
+        console.log(`[Upload] ขนาดหลังบีบอัด: ${sizeKB} KB (${mimeType})`);
+        setProgress(30, `บีบอัดเสร็จ (${sizeKB} KB) — กำลังส่ง...`);
+
+        // Step 2: Send to GAS
+        const payload = {
+          action:      "upload",
+          fileName:    selectedFile.name.replace(/[^\\w.\\-]/g, "_"),
+          mimeType:    mimeType,
+          base64Data:  base64Data,
+          title:       title,
+          description: $upDesc.value.trim(),
+          category:    category,
+          date:        $upDate.value.trim()
+        };
+
+        const progressTimer = animateProgress(30, 88, 30000);
+
+        let res;
+        try {
+          res = await fetch(GAS_URL, {
+            method:   "POST",
+            headers:  { "Content-Type": "text/plain;charset=utf-8" },
+            body:     JSON.stringify(payload),
+            redirect: "follow"
+          });
+        } catch (networkErr) {
+          throw new Error("เชื่อมต่อ Server ไม่ได้ — ตรวจสอบ GAS_URL และการเชื่อมต่ออินเทอร์เน็ต");
+        }
+
+        clearInterval(progressTimer);
+        if (uploadAborted) return;
+
+        // Step 3: Parse Response
         const rawText = await res.text();
         let json;
         try {
           json = JSON.parse(rawText);
         } catch (_) {
-          console.error("[Upload] GAS response not JSON:", rawText.slice(0, 200));
-          throw new Error("GAS ตอบกลับผิดรูปแบบ — กรุณา Redeploy Web App ใหม่");
+          console.error("[Upload] GAS ตอบกลับไม่ใช่ JSON:\n", rawText.slice(0, 500));
+          throw new Error("GAS ตอบกลับผิดรูปแบบ — กรุณา Redeploy Web App แบบ 'New Version' และตรวจสอบว่า 'Execute as: Me' และ 'Who has access: Anyone'");
         }
-        
+
         if (json.status !== "success") throw new Error(json.message || "อัปโหลดไม่สำเร็จ");
-        
-        $uploadLottiePct.textContent = "100%";
-        $uploadLottieLabel.textContent = "✅ อัปโหลดสำเร็จ!";
+
+        // Step 4: Success
+        setProgress(100, "อัปโหลดสำเร็จ! ✅");
         showToast("success", `✅ อัปโหลด "${title}" สำเร็จ!`);
-        
+
         setTimeout(async () => {
           closeUploadModal();
           await loadGallery();
-        }, 1000);
-        
+        }, 900);
+
       } catch (err) {
-        clearInterval(progressInterval);
+        setProgress(0, "");
+        $progressWrap.classList.add("hidden");
         hideUploadLottie();
         $submitBtn.disabled = false;
         showToast("error", "❌ " + err.message);
@@ -1420,52 +1440,78 @@
       }
     });
 
-    // ── Lottie Upload Animation Helpers ─────────────
-    const $uploadLottieWrap  = document.getElementById("upload-lottie-wrap");
-    const $uploadLottieEl    = document.getElementById("upload-lottie-canvas");
-    const $uploadLottiePct   = document.getElementById("upload-lottie-pct");
-    const $uploadLottieLabel = document.getElementById("upload-lottie-label");
-    let uploadLottie = null;
+    // ── Helpers: Upload ──────────────────────────────
+    function compressImage(file, MAX_PX = 1400, QUALITY = 0.82) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
 
-    function showUploadLottie(label) {
-      $progressWrap.classList.add("hidden");
-      $uploadLottieWrap.classList.remove("hidden");
-      $uploadLottieLabel.textContent = label || "กำลังอัปโหลด...";
-      $uploadLottiePct.textContent = "0%";
-      
-      if (!uploadLottie) {
-        uploadLottie = lottie.loadAnimation({
-          container: $uploadLottieEl,
-          renderer: "svg",
-          loop: true,
-          autoplay: true,
-          path: "lottie-loading.json"
-        });
-      } else {
-        uploadLottie.play();
-      }
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+
+          let { width, height } = img;
+          if (width > MAX_PX || height > MAX_PX) {
+            if (width >= height) {
+              height = Math.round(height * MAX_PX / width);
+              width  = MAX_PX;
+            } else {
+              width  = Math.round(width * MAX_PX / height);
+              height = MAX_PX;
+            }
+          }
+
+          const canvas    = document.createElement("canvas");
+          canvas.width    = width;
+          canvas.height   = height;
+          const ctx = canvas.getContext("2d");
+          
+          // ใส่พื้นหลังสีขาวก่อนวาด (ป้องกัน PNG โปร่งใสกลายเป็นดำ)
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const dataURL    = canvas.toDataURL("image/jpeg", QUALITY);
+          const base64Data = dataURL.split(",")[1];
+          const sizeKB     = Math.round(base64Data.length * 0.75 / 1024);
+
+          resolve({ base64Data, mimeType: "image/jpeg", sizeKB });
+        };
+
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error("อ่านไฟล์รูปภาพไม่ได้"));
+        };
+
+        // Safari/iOS compatibility
+        img.decoding = "async";
+        img.src = url;
+      });
     }
-    
-    function hideUploadLottie() {
-      $uploadLottieWrap.classList.add("hidden");
-      if (uploadLottie) {
-        uploadLottie.pause();
-      }
-    }
-    
+
     function setProgress(pct, label) {
-      if ($progressWrap) {
-        $progressFill.style.width = pct + "%";
-        $progressPct.textContent = pct + "%";
-        if (label) $progressLabel.textContent = label;
-      }
+      $progressFill.style.width  = pct + "%";
+      $progressPct.textContent   = pct + "%";
+      if (label) $progressLabel.textContent = label;
+      
+      // Update Lottie display if visible
       if (!$uploadLottieWrap.classList.contains("hidden")) {
-        $uploadLottiePct.textContent = Math.round(pct) + "%";
-        if (label) $uploadLottieLabel.textContent = label;
+        setUploadLottieProgress(pct, label);
       }
     }
 
-    // ── Toast ───────────────────────────────────────
+    function animateProgress(from, to, durationMs) {
+      const steps    = 60;
+      const stepSize = (to - from) / steps;
+      let   current  = from;
+      const id = setInterval(() => {
+        current = Math.min(current + stepSize, to);
+        setProgress(current, $progressLabel.textContent);
+        if (current >= to) clearInterval(id);
+      }, durationMs / steps);
+      return id;
+    }
+
+    // ── Toast Notification ───────────────────────────
     let toastTimer;
     function showToast(type, msg) {
       const $toast = document.getElementById("toast");
@@ -1485,6 +1531,7 @@
         navigator.serviceWorker.register("sw.js")
           .then(reg => {
             console.log("[PWA] SW registered:", reg.scope);
+
             reg.addEventListener("updatefound", () => {
               const newWorker = reg.installing;
               newWorker.addEventListener("statechange", () => {
@@ -1502,19 +1549,23 @@
     //  PWA — Install Prompt
     // ════════════════════════════════════════════════
     let deferredPrompt = null;
+
     window.addEventListener("beforeinstallprompt", e => {
       e.preventDefault();
       deferredPrompt = e;
       showInstallBanner();
     });
+
     window.addEventListener("appinstalled", () => {
       deferredPrompt = null;
       hideInstallBanner();
-      showToast("success", "✅ ติดตั้งแอปสำเร็จ! เปิดจาก Home Screen ได้เลย");
+      showToast("success", "✅ ติดตั้งแอปสำเร็จ! สามารถเปิดจาก Home Screen ได้เลย");
     });
 
     function showInstallBanner() {
-      if (document.getElementById("install-banner")) return;
+      const existing = document.getElementById("install-banner");
+      if (existing) return;
+
       const banner = document.createElement("div");
       banner.id = "install-banner";
       banner.style.cssText = `
@@ -1541,46 +1592,65 @@
             padding:.35rem .5rem; background:#30363d; color:#8b949e; border:none;
             border-radius:6px; font-size:.75rem; cursor:pointer;">✕</button>
         </div>`;
+
       document.body.appendChild(banner);
+
       document.getElementById("install-btn").addEventListener("click", async () => {
         if (!deferredPrompt) return;
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
+        console.log("[PWA] Install outcome:", outcome);
         deferredPrompt = null;
         hideInstallBanner();
       });
+
       document.getElementById("install-dismiss").addEventListener("click", () => {
         hideInstallBanner();
         localStorage.setItem("pwa-dismiss", Date.now() + 7 * 24 * 60 * 60 * 1000);
       });
     }
+
     function hideInstallBanner() {
       const banner = document.getElementById("install-banner");
       if (banner) banner.remove();
     }
-    const dismissedUntil = parseInt(localStorage.getItem("pwa-dismiss") || "0");
-    if (Date.now() > dismissedUntil) {}
 
+    const dismissedUntil = parseInt(localStorage.getItem("pwa-dismiss") || "0");
+    if (Date.now() > dismissedUntil) {
+      // แสดง banner ได้ตามปกติ
+    }
+
+    // ── Handle ?action=upload shortcut ──────────
     if (new URLSearchParams(location.search).get("action") === "upload") {
       window.addEventListener("load", () => setTimeout(openUploadModal, 800));
     }
 
     // ════════════════════════════════════════════════
-    //  SPLASH SCREEN & LOTTIE
+    //  LOTTIE — Instances
     // ════════════════════════════════════════════════
     let splashLottie = null;
+    let uploadLottie = null;
+
+    function loadLottie(container, loop, autoplay) {
+      return lottie.loadAnimation({
+        container:  container,
+        renderer:   "svg",
+        loop:       loop,
+        autoplay:   autoplay,
+        path:       "lottie-loading.json"
+      });
+    }
+
+    // ════════════════════════════════════════════════
+    //  SPLASH SCREEN
+    // ════════════════════════════════════════════════
     const $splash       = document.getElementById("splash");
     const $splashLottie = document.getElementById("splash-lottie");
 
     function initSplash() {
-      splashLottie = lottie.loadAnimation({
-        container: $splashLottie,
-        renderer: "svg",
-        loop: true,
-        autoplay: true,
-        path: "lottie-loading.json"
-      });
+      splashLottie = loadLottie($splashLottie, true, true);
     }
+
     function hideSplash() {
       if (!$splash || $splash.classList.contains("gone")) return;
       $splash.classList.add("hiding");
@@ -1589,15 +1659,58 @@
         if (splashLottie) { splashLottie.destroy(); splashLottie = null; }
       }, 600);
     }
+
     initSplash();
 
+    // ════════════════════════════════════════════════
+    //  UPLOAD LOTTIE
+    // ════════════════════════════════════════════════
+    const $uploadLottieWrap  = document.getElementById("upload-lottie-wrap");
+    const $uploadLottieEl    = document.getElementById("upload-lottie-canvas");
+    const $uploadLottiePct   = document.getElementById("upload-lottie-pct");
+    const $uploadLottieLabel = document.getElementById("upload-lottie-label");
+
+    function showUploadLottie(label) {
+      $progressWrap.classList.add("hidden");
+      $uploadLottieWrap.classList.remove("hidden");
+      $uploadLottieLabel.textContent = label || "กำลังเตรียมไฟล์...";
+      $uploadLottiePct.textContent   = "0%";
+
+      if (!uploadLottie) {
+        uploadLottie = loadLottie($uploadLottieEl, true, true);
+      } else {
+        uploadLottie.play();
+      }
+    }
+
+    function hideUploadLottie() {
+      $uploadLottieWrap.classList.add("hidden");
+      if (uploadLottie) { uploadLottie.pause(); }
+    }
+
+    function setUploadLottieProgress(pct, label) {
+      $uploadLottiePct.textContent   = Math.round(pct) + "%";
+      if (label) $uploadLottieLabel.textContent = label;
+    }
+
+    // ════════════════════════════════════════════════
+    //  INIT
+    // ════════════════════════════════════════════════
     async function initApp() {
       const splashTimeout = setTimeout(hideSplash, 4000);
       await loadGallery();
       clearTimeout(splashTimeout);
       setTimeout(hideSplash, 400);
     }
+
     initApp();
   </script>
 </body>
 </html>
+'''
+
+# Append to existing file
+with open('/mnt/agents/output/index.html', 'a', encoding='utf-8') as f:
+    f.write(index_html_js)
+
+print("index.html completed successfully")
