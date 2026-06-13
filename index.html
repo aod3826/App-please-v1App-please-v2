@@ -12,9 +12,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Gallery" />
-  <link rel="apple-touch-icon" href="icon-192x192.png" />
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192x192.png" />
-  <link rel="icon" type="image/png" sizes="512x512" href="icon-512x512.png" />
+  <link rel="apple-touch-icon" href="/App-please-v1App-please-v2/icon-192x192.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/App-please-v1App-please-v2/icon-192x192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/App-please-v1App-please-v2/icon-512x512.png" />
 
   <!-- ═══ Lottie Animation ═══ -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
@@ -1534,7 +1534,9 @@
     // ════════════════════════════════════════════════
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js")
+        navigator.serviceWorker.register("sw.js", {
+          scope: "/App-please-v1App-please-v2/"
+        })
           .then(reg => {
             console.log("[PWA] SW registered:", reg.scope);
 
@@ -1647,7 +1649,7 @@
         renderer:   "svg",
         loop:       loop,
         autoplay:   autoplay,
-        path:       "lottie-loading.json"
+        path:       "/App-please-v1App-please-v2/lottie-loading.json"
       });
     }
 
