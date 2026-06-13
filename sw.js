@@ -161,10 +161,15 @@ async function networkFirst(request) {
     const cached = await cache.match(request);
     if (cached) return cached;
     // ถ้าเป็น navigation request ให้แสดง offline page
+    // ถ้าเป็น navigation request ให้แสดง offline page
     if (request.mode === "navigate") {
-      return new Response(OFFLINE_HTML, {
-        headers: { "Content-Type": "text/html; charset=utf-8" }
-      });
+      // สำหรับ GitHub Pages sub-path ต้องเช็ค scope ด้วย
+      const url = new URL(request.url);
+      if (url.pathname.startsWith("/App-please-v1App-please-v2/")) {
+        return new Response(OFFLINE_HTML, {
+          headers: { "Content-Type": "text/html; charset=utf-8" }
+        });
+      }
     }
     throw err;
   }
