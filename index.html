@@ -961,6 +961,7 @@
   <!-- ══════════════════ FOOTER ══════════════════ -->
   <footer class="relative z-10 border-t border-dark-700/50 py-6 text-center">
     <p class="font-prompt text-xs text-dark-500">Gallery System • Powered by Google Apps Script</p>
+    <p class="font-prompt text-xs text-dark-600 mt-2">Developed by <span class="text-brand-400 font-semibold">อ๊อด</span></p>
   </footer>
 
 
@@ -969,7 +970,7 @@
     // ╔══════════════════════════════════════════════╗
     // ║  ⚙️  CONFIG — แก้ไขค่านี้เพียงจุดเดียว       ║
     // ╚══════════════════════════════════════════════╝
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwv93_3C63uUglzkEaLYjOZ9JJOI2KtzJ_582VzbXblhr-YrHLy91b4OO095ugQFHREiw/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyPghqA070LklU4Y7hmirLaUtKDu6ii8li7B3bWzRiNTKUMds-Gbt1kufT67SCuOd0s/exec";
     //                                                ↑ วางลิงก์ Web App ของคุณตรงนี้
 
     // ── State ──────────────────────────────────────
@@ -1015,7 +1016,7 @@
         const json = await res.json();
         if (json.status !== "success") throw new Error(json.message || "ข้อมูลไม่ถูกต้อง");
 
-        allItems = json.data || [];
+        allItems = (json.data || []).sort((a, b) => b.id - a.id);  // ✨ Latest อยู่บนสุด
         buildCategoryPills();
         applyFilters();
 
@@ -1432,16 +1433,27 @@
 
         // ── Step 4: สำเร็จ ─────────────────────────────────────
         setUploadProgress(100, "อัปโหลดสำเร็จ! ✅");
+        
+        // แสดง checkmark animation ตอนสำเร็จ
+        hideUploadLottie();
+        if (uploadLottie) { uploadLottie.destroy(); uploadLottie = null; }
+        
+        const successLottie = loadLottie($uploadLottieEl, false, true);
+        $uploadLottieWrap.classList.remove("hidden");
+        $uploadLottieLabel.textContent = "อัปโหลดเสร็จแล้ว! 🎉";
+        $uploadLottiePct.textContent = "100%";
+        
         showToast("success", `✅ อัปโหลด "${title}" สำเร็จ!`);
 
         setTimeout(async () => {
+          successLottie.destroy();
           hideUploadLottie();
           resetUploadForm();
           const $modal = document.getElementById("upload-modal");
           $modal.classList.add("hidden");
           document.body.style.overflow = "";
           await loadGallery();
-        }, 1000);
+        }, 2200);
 
       } catch (err) {
         hideUploadLottie();
