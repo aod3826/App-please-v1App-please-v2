@@ -969,7 +969,7 @@
     // ╔══════════════════════════════════════════════╗
     // ║  ⚙️  CONFIG — แก้ไขค่านี้เพียงจุดเดียว       ║
     // ╚══════════════════════════════════════════════╝
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzIVg6QN6VYZ4N1fv-ZmKliFGVLlPau9zJkpQ4X9NGHQTEYjaNkJQnFJZKFHcnvcxh0Fw/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwv93_3C63uUglzkEaLYjOZ9JJOI2KtzJ_582VzbXblhr-YrHLy91b4OO095ugQFHREiw/exec";
     //                                                ↑ วางลิงก์ Web App ของคุณตรงนี้
 
     // ── State ──────────────────────────────────────
@@ -1397,15 +1397,22 @@
 
         let res;
         try {
+          console.log("[Upload] ส่ง POST ไปที่:", GAS_URL);
+          console.log("[Upload] Content-Type:", "text/plain;charset=utf-8");
+          console.log("[Upload] Payload size:", JSON.stringify(payload).length, "bytes");
+          
           res = await fetch(GAS_URL, {
             method:   "POST",
             headers:  { "Content-Type": "text/plain;charset=utf-8" },
             body:     JSON.stringify(payload),
             redirect: "follow"
           });
+          
+          console.log("[Upload] Response status:", res.status, res.statusText);
         } catch (networkErr) {
-          clearInterval(progressTimer);
-          throw new Error("เชื่อมต่อ Server ไม่ได้ — ตรวจสอบ GAS_URL และการเชื่อมต่ออินเทอร์เน็ต");
+          console.error("[Fetch Error]", networkErr.message);
+          console.error("[Fetch Error] Full error:", networkErr);
+          throw new Error(`Network error: ${networkErr.message} — ตรวจสอบเน็ต/GAS_URL/Browser Console`);
         }
 
         clearInterval(progressTimer);
@@ -1698,7 +1705,16 @@
     }
 
     // ════════════════════════════════════════════════
-    //  INIT
+    //  CONFIG CHECK
+    // ════════════════════════════════════════════════
+    window.addEventListener("load", () => {
+      if (GAS_URL.includes("AKfycby") && GAS_URL.includes("exec")) {
+        console.log("✅ GAS_URL ตั้งค่าถูกต้อง:", GAS_URL);
+      } else {
+        console.error("❌ GAS_URL ยังไม่ถูกต้อง:", GAS_URL);
+        showToast("error", "⚠️ GAS_URL ไม่ถูกต้อง - ตรวจสอบ index.html ให้ดี");
+      }
+    });
     // ════════════════════════════════════════════════
 
     // โหลด Gallery → ปิด Splash เมื่อข้อมูลพร้อม (หรือ error)
